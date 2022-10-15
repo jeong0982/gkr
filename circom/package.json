@@ -1,0 +1,17 @@
+{
+  "name": "gkr-verifier",
+  "version": "1.0.0",
+  "description": "GKR verifier in circom",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "zkp"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "circomlib": "2.0.5"
+  }
+}
