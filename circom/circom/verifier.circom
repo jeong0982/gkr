@@ -29,6 +29,8 @@ template GetInitialClaim(npowtwo) {
 
 template VerfiyGKR(nLayer, npowtwo) {
     signal input claims[nLayer - 1];
+    signal input sumcheckProof[nLayer][]
+
     signal input circuit[nLayer][3];
     signal input layerNumber;
     signal input out[npowtwo ** 2];
