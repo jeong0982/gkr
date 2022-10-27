@@ -23,9 +23,9 @@ template recombineMulticlaims(nClaim) {
     }
 
     component evaluated = evalUnivariate(nClaim);
-    evaluated.challenge <== challenge.out;
+    evaluated.x <== challenge.out;
     for (var i = 0; i < nClaim; i++) {
-        evaluated.claims[i] <== claims[i];
+        evaluated.coeffs[i] <== claims[i];
     }
     evaluatedValue <== evaluated.evaluated[0];
     recombinedClaim <== challenge.out;
