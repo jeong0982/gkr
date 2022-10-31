@@ -21,6 +21,15 @@ def Convert(string):
 # TODO
 # FS transform
 # separate prover and verifier
+def prove_sumcheck(c, g, v):
+    
+    proof = [0] * v
+    challenges = [0]
+    return proof, challenges
+
+def verify_sumcheck(p):
+    pass
+
 def sumcheck(c: field.FQ, g, v):
 
     if(v == 1 and (g([0]) + g([1])) == c):
