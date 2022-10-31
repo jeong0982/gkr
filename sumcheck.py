@@ -1,4 +1,6 @@
 from ethsnarks import field
+from poly import *
+from util import *
 
 def generate_binary_strings(bit_count):
     binary_strings = []
@@ -21,19 +23,32 @@ def Convert(string):
 # TODO
 # FS transform
 # separate prover and verifier
-def prove_sumcheck(c, g, v):
+def prove_sumcheck(c, g, v: int):
+    proof = [[field.FQ.zero()]] * v
     
-    proof = [0] * v
-    challenges = [0]
-    return proof, challenges
+    return proof
 
-def verify_sumcheck(p):
-    pass
+def verify_sumcheck(claims, p: list[list[field.FQ]], g, v: int):
+    bn = len(p)
+    if(v == 1 and (g([0]) + g([1])) == claims[0]):
+        return True, []
+    expected = claims[0]
+    for i in range(bn):
+        q_zero = eval_univariate(p[i], field.FQ.zero())
+        q_one = eval_univariate(p[i], field.FQ.one())
+
+        if q_zero + q_one != expected:
+            return False
+
+        r = get_challenge(p[i])
+        expected = eval_univariate(p[i], r)
+
+    return True
 
 def sumcheck(c: field.FQ, g, v):
 
     if(v == 1 and (g([0]) + g([1])) == c):
-        return True
+        return True, []
 
     g_vector = [field.FQ(0)] * v
     r = [field.FQ(0)] * v
@@ -57,7 +72,7 @@ def sumcheck(c: field.FQ, g, v):
         return output
 
     if (g_1(field.FQ(0)) + g_1(field.FQ(1))) != c:
-        return False
+        return False, []
     else:
         r[0] = field.FQ.random()
         g_vector[0] = g_1(r[0])
@@ -79,7 +94,7 @@ def sumcheck(c: field.FQ, g, v):
             return output
 
         if g_vector[j - 1] != (g_j(0) + g_j(1)):
-            return False
+            return False, []
         else:
             r[j] = field.FQ.random()
             g_vector[j] = g_j(r[j])
@@ -90,11 +105,11 @@ def sumcheck(c: field.FQ, g, v):
         return g(eval_vector)
 
     if (g_v(0) + g_v(1)) != g_vector[v - 2]:
-        return False
+        return False, []
     else:
         r[v - 1] = field.FQ.random()
         g_vector[v - 1] = g_v(r[v - 1])
         
         if (g(r) != g_vector[v - 1]):
-            return False
-        return True
+            return False, []
+        return True, r
