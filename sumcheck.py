@@ -1,4 +1,3 @@
-from ethsnarks import field
 from poly import *
 from util import *
 from typing import Callable
@@ -6,83 +5,60 @@ from typing import Callable
 # TODO
 # FS transform
 # separate prover and verifier
-def prove_sumcheck(c, g, v: int):
-    proof = [[field.FQ.zero()]] * v
+def prove_sumcheck(g: polynomial, v: int):
+    proof = []
+    r = []
+    # first round
+    # g1(X1)=∑(x2,⋯,xv)∈{0,1}^v g(X_1,x_2,⋯,x_v)    
+    g_1 = polynomial([])
+    assignments = generate_binary(v - 1)
+    for assignment in assignments:
+        g_1_sub = polynomial(g.terms[:])
+        for i, x_i in enumerate(assignment):
+            idx = i + 2
+            g_1_sub.eval_i(x_i, idx)
+        g_1 += g_1_sub
+    proof.append(g_1.get_all_coefficients())
     
-    return proof
+    r.append(field.FQ.random()) # TODO FS
 
-def verify_sumcheck(claims, p: list[list[field.FQ]], g, v: int):
-    bn = len(p)
-    if(v == 1 and (g([0]) + g([1])) == claims[0]):
-        return True, []
-    expected = claims[0]
+    # 1 < j < v round
+    for j in range(1, v - 1):
+        g_j = polynomial(g.terms[:])
+        assignments = generate_binary(v - j - 1)
+        for i, r_i in enumerate(r):
+            idx = i + 1
+            g_j = g_j.eval_i(r_i, idx)
+        for assignment in assignments:
+            g_j_sub = polynomial(g_j.terms[:])
+            for x_i in assignment:
+                idx = j + 1
+                g_j_sub.eval_i(x_i, idx)
+            g_j += g_j_sub
+        proof.append(g_j.get_all_coefficients())
+
+        r.append(field.FQ.random())
+
+    g_v = polynomial(g.terms[:])
+    for i, r_i in enumerate(r):
+        idx = i + 1
+        g_v = g_v.eval_i(r_i, idx)
+    proof.append(g_v.get_all_coefficients())
+
+    return proof, r
+
+def verify_sumcheck(claim, proof: list[list[field.FQ]], r, v: int):
+    bn = len(proof)
+    if(v == 1 and (eval_univariate(proof[0], field.FQ.zero()) + eval_univariate(proof[0], field.FQ.one())) == claim):
+        return True
+    expected = claim
     for i in range(bn):
-        q_zero = eval_univariate(p[i], field.FQ.zero())
-        q_one = eval_univariate(p[i], field.FQ.one())
+        q_zero = eval_univariate(proof[i], field.FQ.zero())
+        q_one = eval_univariate(proof[i], field.FQ.one())
 
         if q_zero + q_one != expected:
             return False
 
-        r = get_challenge(p[i])
-        expected = eval_univariate(p[i], r)
+        expected = eval_univariate(proof[i], r[i])
 
     return True
-
-def sumcheck(c: field.FQ, g: Callable[[list[field.FQ]], field.FQ], v):
-
-    if(v == 1 and (g([field.FQ.zero()]) + g([field.FQ.one()])) == c):
-        return True, []
-
-    g_vector = [field.FQ(0)] * v
-    r = [field.FQ(0)] * v
-
-    # first round
-    # g1(X1)=∑(x2,⋯,xv)∈{0,1}^v g(X_1,x_2,⋯,x_v)
-    def g_1(x_1):
-        assignment = generate_binary(v - 1)
-        for i in range(len(assignment)):
-            assignment[i].insert(0, x_1)
-
-        output = field.FQ(0)
-
-        for i in range(2 ** (v - 1)):
-            output += g(assignment[i])
-        return output
-
-    if (g_1(field.FQ(0)) + g_1(field.FQ(1))) != c:
-        return False, []
-    else:
-        r[0] = field.FQ.random()
-        g_vector[0] = g_1(r[0])
-
-    for j in range(1, v - 1): # 1 < j < v round
-        def g_j(x: field.FQ):
-            assignment = generate_binary(v - j - 1)
-            for i in range(len(assignment)):
-                assignment[i] = r[0 : j] + [x] + assignment[i]
-
-            output = field.FQ(0)
-            for i in range(len(assignment)):
-                output += g(assignment[i]) 
-            return output
-
-        if g_vector[j - 1] != (g_j(field.FQ.zero()) + g_j(field.FQ.one())):
-            return False, []
-        else:
-            r[j] = field.FQ.random()
-            g_vector[j] = g_j(r[j])
-
-    def g_v(x_v):
-        eval_vector = r
-        eval_vector[v - 1] = x_v
-        return g(eval_vector)
-
-    if (g_v(0) + g_v(1)) != g_vector[v - 2]:
-        return False, []
-    else:
-        r[v - 1] = field.FQ.random()
-        g_vector[v - 1] = g_v(r[v - 1])
-        
-        if (g(r) != g_vector[v - 1]):
-            return False, []
-        return True, r
