@@ -65,15 +65,17 @@ def ell(p1: list[field.FQ], p2: list[field.FQ], t: field.FQ):
 
 
 class Proof:
-    def __init__(self, proofs, D) -> None:
+    def __init__(self, proofs, D, q) -> None:
       self.sumcheckProofs : list[list[field.FQ]] = proofs
       self.D = D
+      self.q : list[list[field.FQ]] = q
 
 # TODO
 def prove(circuit: Circuit, D):
     z = [[]]*circuit.depth()
     z[0] = [field.FQ.zero()]*int(circuit.layer_length(0)/2)
     sumcheck_proofs = []
+    q = []
     for i in range(len(z[0])):
         z[0][i] = field.FQ.random() # TODO - randomness of first value
 
@@ -91,12 +93,13 @@ def prove(circuit: Circuit, D):
 
         q_zero = eval_ext(circuit.w_i(i + 1), ell(b_star, c_star, field.FQ.zero()))
         q_one = eval_ext(circuit.w_i(i + 1), ell(b_star, c_star, field.FQ.one()))
+        q.append([q_zero, q_one])
 
         r_star = field.FQ.random()
         next_r = ell(b_star, c_star, r_star)
         z[i+1] = next_r # r_(i + 1)
 
-    proof = Proof(sumcheck_proofs, D)
+    proof = Proof(sumcheck_proofs, D, q)
     return proof
 
 def verify(circuit: Circuit, proof: Proof, z):
@@ -120,8 +123,8 @@ def verify(circuit: Circuit, proof: Proof, z):
             b_star = r[0: int(circuit.layer_length(i + 1) / 2)]
             c_star = r[int(circuit.layer_length(i + 1) / 2):int(circuit.layer_length(i + 1))]
 
-            q_zero = eval_ext(circuit.w_i(i + 1), ell(b_star, c_star, field.FQ.zero()))
-            q_one = eval_ext(circuit.w_i(i + 1), ell(b_star, c_star, field.FQ.one()))
+            q_zero = proof.q[i][0]
+            q_one = proof.q[i][0]
 
             def modified_f():
                 return  eval_ext(circuit.add_i(i), z[i] + b_star + c_star) * (q_zero + q_one) \
