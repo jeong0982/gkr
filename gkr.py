@@ -1,3 +1,5 @@
+import math
+from poly import *
 from sumcheck import *
 
 class Node:
@@ -42,6 +44,9 @@ class Circuit:
     def layer_length(self, layer):
         return self.layers[layer].len()
     
+    def k_i(self, layer):
+        return int(math.log2(self.layer_length(layer)))
+
     def add_i(self, i):
         return self.layers[i].add
     
@@ -65,31 +70,41 @@ def ell(p1: list[field.FQ], p2: list[field.FQ], t: field.FQ):
 
 
 class Proof:
-    def __init__(self, proofs, D, q) -> None:
-      self.sumcheckProofs : list[list[field.FQ]] = proofs
+    def __init__(self, proofs, D, q, z) -> None:
+      self.sumcheckProofs : list[list[list[field.FQ]]] = proofs
       self.D = D
       self.q : list[list[field.FQ]] = q
+      self.z = z
 
-# TODO
 def prove(circuit: Circuit, D):
-    z = [[]]*circuit.depth()
-    z[0] = [field.FQ.zero()]*int(circuit.layer_length(0)/2)
+    z = [[]] * circuit.depth()
+    z[0] = [field.FQ.zero()] * circuit.k_i(0)
     sumcheck_proofs = []
     q = []
     for i in range(len(z[0])):
         z[0][i] = field.FQ.random() # TODO - randomness of first value
 
     for i in range(circuit.depth() - 1):
-        def f(x):
-            b = x[:(len(x) // 2)]
-            c = x[len(x) // 2:]
-            return  eval_ext(circuit.add_i(i), z[i] + b + c) * (eval_ext(circuit.w_i(i), b) + eval_ext(circuit.w_i(i), c)) \
-                + eval_ext(circuit.mult_i(i), z[i] + b + c) * (eval_ext(circuit.w_i(i), b) * eval_ext(circuit.w_i(i), c))
-        sumcheck_proof, r = prove_sumcheck(field.FQ.random(), f, circuit.layer_length(i))
+        add_i_ext = get_ext(circuit.add_i(i), circuit.k_i(i) + 2 * circuit.k_i(i + 1))
+        for j, r in enumerate(z[i]):
+            add_i_ext = add_i_ext.eval_i(r, j)
+        
+        mult_i_ext = get_ext(circuit.mult_i(i), circuit.k_i(i) + 2 * circuit.k_i(i + 1))
+        for j, r in enumerate(z[i]):
+            mult_i_ext = mult_i_ext.eval_i(r, j)
+        
+        w_i_ext_b = get_ext_from_k(circuit.w_i(i + 1), circuit.k_i(i + 1), circuit.k_i(i) + 1)
+        w_i_ext_c = get_ext_from_k(circuit.w_i(i + 1), circuit.k_i(i + 1), circuit.k_i(i) + circuit.k_i(i + 1) + 1)
+
+        first = add_i_ext * (w_i_ext_b + w_i_ext_c)
+        second = mult_i_ext * w_i_ext_b * w_i_ext_c
+        f = first + second
+
+        sumcheck_proof, r = prove_sumcheck(f, circuit.layer_length(i))
         sumcheck_proofs.append(sumcheck_proof)
 
-        b_star = r[0: int(circuit.layer_length(i + 1) / 2)]
-        c_star = r[int(circuit.layer_length(i + 1) / 2):int(circuit.layer_length(i + 1))]
+        b_star = r[0: (circuit.layer_length(i + 1) / 2)]
+        c_star = r[(circuit.layer_length(i + 1) / 2):(circuit.layer_length(i + 1))]
 
         q_zero = eval_ext(circuit.w_i(i + 1), ell(b_star, c_star, field.FQ.zero()))
         q_one = eval_ext(circuit.w_i(i + 1), ell(b_star, c_star, field.FQ.one()))
@@ -99,7 +114,7 @@ def prove(circuit: Circuit, D):
         next_r = ell(b_star, c_star, r_star)
         z[i+1] = next_r # r_(i + 1)
 
-    proof = Proof(sumcheck_proofs, D, q)
+    proof = Proof(sumcheck_proofs, D, q, z)
     return proof
 
 def verify(circuit: Circuit, proof: Proof, z):
@@ -115,9 +130,10 @@ def verify(circuit: Circuit, proof: Proof, z):
             c = x[len(x) // 2:]
             return  eval_ext(circuit.add_i(i), z[i] + b + c) * (eval_ext(circuit.w_i(i), b) + eval_ext(circuit.w_i(i), c)) \
                 + eval_ext(circuit.mult_i(i), z[i] + b + c) * (eval_ext(circuit.w_i(i), b) * eval_ext(circuit.w_i(i), c))
-        val, r = sumcheck(m[i], f, (circuit.layer_length(i+1)))
+        
+        valid = verify_sumcheck(field.FQ(0), proof.sumcheckProofs[i], proof.z[i], 2 * circuit.k_i(i))
 
-        if not val:
+        if not valid:
             return False
         else:
             b_star = r[0: int(circuit.layer_length(i + 1) / 2)]
@@ -129,7 +145,8 @@ def verify(circuit: Circuit, proof: Proof, z):
             def modified_f():
                 return  eval_ext(circuit.add_i(i), z[i] + b_star + c_star) * (q_zero + q_one) \
                         + eval_ext(circuit.mult_i(i), z[i] + b_star + c_star) * (q_zero * q_one)
-
+            # TODO
+            # gkr verifier should compute f without f
             if f(b_star + c_star) != modified_f():
                 return False
             else:

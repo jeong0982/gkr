@@ -53,7 +53,7 @@ class polynomial:
     def __add__(self, other):
         return polynomial(self.terms + other.terms)
     
-    def __mult__(self, other):
+    def __mul__(self, other):
         new_terms = []
         for a in self.terms:
             for b in other.terms:
@@ -169,6 +169,18 @@ def chi_w(w: list[field.FQ]):
     mono = monomial(field.FQ.one(), prod)
     return mono
 
+# for f(x) in gkr
+def chi_w_from_k(w: list[field.FQ], k: int):
+    prod = []
+    for i, w_i in enumerate(w):
+        if w_i == field.FQ.zero():
+            prod.append(term(field.FQ(-1), i + k, field.FQ(1)))
+        elif w_i == field.FQ.one():
+            prod.append(term(field.FQ(1), i + k, field.FQ(0)))
+    
+    mono = monomial(field.FQ.one(), prod)
+    return mono
+
 def eval_ext(f: Callable[[list[field.FQ]], field.FQ], r: list[field.FQ]):
     w = generate_binary(len(r))
     acc = field.FQ.zero()
@@ -177,9 +189,20 @@ def eval_ext(f: Callable[[list[field.FQ]], field.FQ], r: list[field.FQ]):
     return acc
 
 # r : {0, 1}^v
-def get_ext(f: Callable[[list[field.FQ]], field.FQ], v: int):
+def get_ext(f: Callable[[list[field.FQ]], field.FQ], v: int) -> polynomial:
     w_set = generate_binary(v)
     ext_f = []
     for w in w_set:
-        new_mono = chi_w(w).mult(f(w))
-        ext_f.append(new_mono)
+        res = chi_w(w)
+        res.mult(f(w))
+        ext_f.append(res)
+    return polynomial(ext_f)
+
+def get_ext_from_k(f: Callable[[list[field.FQ]], field.FQ], v: int, k: int) -> polynomial:
+    w_set = generate_binary(v)
+    ext_f = []
+    for w in w_set:
+        res = chi_w_from_k(w, k)
+        res.mult(f(w))
+        ext_f.append(res)
+    return polynomial(ext_f)
