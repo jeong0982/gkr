@@ -33,7 +33,10 @@ class Layer:
 
 class Circuit:
     def __init__(self, depth):
-        self.layers : list[Layer] = [Layer()] * depth  # type: ignore
+        layers = []
+        for _ in range(depth):
+            layers.append(Layer())
+        self.layers : list[Layer] = layers # type: ignore
     
     def get_node(self, layer, index):
         return self.layers[layer].get_node(index)
@@ -98,7 +101,6 @@ def prove(circuit: Circuit, D):
         mult_i_ext = get_ext(circuit.mult_i(i), circuit.k_i(i) + 2 * circuit.k_i(i + 1))
         for j, r in enumerate(z[i]):
             mult_i_ext = mult_i_ext.eval_i(r, j)
-        
         w_i_ext_b = get_ext_from_k(circuit.w_i(i + 1), circuit.k_i(i + 1), circuit.k_i(i) + 1)
         w_i_ext_c = get_ext_from_k(circuit.w_i(i + 1), circuit.k_i(i + 1), circuit.k_i(i) + circuit.k_i(i + 1) + 1)
 

@@ -47,7 +47,7 @@ def prove_sumcheck(g: polynomial, v: int):
 
     return proof, r
 
-def verify_sumcheck(claim, proof: list[list[field.FQ]], r, v: int):
+def verify_sumcheck(claim: field.FQ, proof: list[list[field.FQ]], r, v: int):
     bn = len(proof)
     if(v == 1 and (eval_univariate(proof[0], field.FQ.zero()) + eval_univariate(proof[0], field.FQ.one())) == claim):
         return True

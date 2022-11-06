@@ -24,7 +24,7 @@ class monomial:
     def mult(self, n):
         self.coeff *= n
 
-    def __mult__(self, other):
+    def __mul__(self, other):
         return monomial(self.coeff * other.coeff, self.terms + other.terms)
 
     # univariate
