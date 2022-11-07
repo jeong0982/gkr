@@ -21,9 +21,9 @@ c.add_node(0, 1, [1], 6, left=b3, right=b4)
 
 def W0func(arr):
   if(arr == [field.FQ(0)]):
-    return field.FQ(25)
+    return field.FQ(36)
   elif (arr == [field.FQ(1)]):
-    return field.FQ(160)
+    return field.FQ(6)
 
 c.layers[0].add_func(W0func)
 
@@ -52,13 +52,13 @@ c.add_node(1, 3, [1,1], 1, left=c4, right=c4)
 
 def W1Func(bitstring):
   if bitstring == [zero, zero]:
-    return field.FQ(1)
+    return field.FQ(9)
   elif bitstring == [zero, one]:
-    return field.FQ(25)
-  elif bitstring == [one, zero]:
-    return field.FQ(40)
-  elif bitstring == [one, one]:
     return field.FQ(4)
+  elif bitstring == [one, zero]:
+    return field.FQ(6)
+  elif bitstring == [one, one]:
+    return field.FQ(1)
 
 c.layers[1].add_func(W1Func)
 
@@ -88,13 +88,13 @@ c.add_node(2, 3, [1,1], 1)
 
 def W2func(bitstring):
   if bitstring == [zero,zero]:
-    return one
+    return field.FQ(3)
   elif bitstring == [zero, one]:
-    return field.FQ(5)
-  elif bitstring == [one, zero]:
-    return field.FQ(8)
-  elif bitstring == [one, one]:
     return field.FQ(2)
+  elif bitstring == [one, zero]:
+    return field.FQ(3)
+  elif bitstring == [one, one]:
+    return field.FQ(1)
 
 c.layers[2].add_func(W2func)
 
@@ -105,9 +105,9 @@ def addlayertwo(_):
 
 def D_func(arr):
   if arr == [zero]:
-    return field.FQ(25)
+    return field.FQ(36)
   elif arr == [one]:
-    return field.FQ(160)
+    return field.FQ(6)
 
 proof = prove(c, D_func)
 print(verify(c, proof))

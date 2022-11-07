@@ -99,11 +99,11 @@ def prove(circuit: Circuit, D):
     for i in range(circuit.depth() - 1):
         add_i_ext = get_ext(circuit.add_i(i), circuit.k_i(i) + 2 * circuit.k_i(i + 1))
         for j, r in enumerate(z[i]):
-            add_i_ext = add_i_ext.eval_i(r, j)
-        
+            add_i_ext = add_i_ext.eval_i(r, j + 1)
+
         mult_i_ext = get_ext(circuit.mult_i(i), circuit.k_i(i) + 2 * circuit.k_i(i + 1))
         for j, r in enumerate(z[i]):
-            mult_i_ext = mult_i_ext.eval_i(r, j)
+            mult_i_ext = mult_i_ext.eval_i(r, j + 1)
 
         w_i_ext_b = get_ext_from_k(circuit.w_i(i + 1), circuit.k_i(i + 1), circuit.k_i(i) + 1)
         w_i_ext_c = get_ext_from_k(circuit.w_i(i + 1), circuit.k_i(i + 1), circuit.k_i(i) + circuit.k_i(i + 1) + 1)
@@ -112,7 +112,9 @@ def prove(circuit: Circuit, D):
         second = mult_i_ext * w_i_ext_b * w_i_ext_c
         f = first + second
 
-        sumcheck_proof, r = prove_sumcheck(f, circuit.layer_length(i + 1))
+        start_idx = circuit.k_i(i) + 1
+
+        sumcheck_proof, r = prove_sumcheck(f, 2 * circuit.k_i(i + 1), start_idx)
         sumcheck_proofs.append(sumcheck_proof)
  
         b_star = r[0: (circuit.layer_length(i + 1) // 2)]
@@ -144,13 +146,12 @@ def verify(circuit: Circuit, proof: Proof):
     m[0] = eval_ext(proof.D, proof.z[0])
 
     for i in range(circuit.depth() - 1):
-        valid = verify_sumcheck(m[i], proof.sumcheck_proofs[i], proof.z[i], 2 * circuit.k_i(i))
-
+        valid = verify_sumcheck(m[i], proof.sumcheck_proofs[i], proof.z[i], 2 * circuit.k_i(i + 1))
         if not valid:
             return False
         else:
-            b_star = proof.z[i][0: circuit.layer_length(i + 1) / 2]
-            c_star = proof.z[i][circuit.layer_length(i + 1) / 2:int(circuit.layer_length(i + 1))]
+            b_star = proof.z[i][0: circuit.layer_length(i + 1) // 2]
+            c_star = proof.z[i][circuit.layer_length(i + 1) // 2:int(circuit.layer_length(i + 1))]
 
             q_zero = proof.q[i][0]
             q_one = proof.q[i][0]

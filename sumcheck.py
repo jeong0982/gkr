@@ -4,7 +4,7 @@ from typing import Callable
 
 # TODO
 # FS transform
-def prove_sumcheck(g: polynomial, v: int):
+def prove_sumcheck(g: polynomial, v: int, start: int):
     proof = []
     r = []
     # first round
@@ -12,10 +12,10 @@ def prove_sumcheck(g: polynomial, v: int):
     g_1 = polynomial([])
     assignments = generate_binary(v - 1)
     for assignment in assignments:
-        g_1_sub = polynomial(g.terms[:])
+        g_1_sub = polynomial(g.terms[:], g.constant)
         for i, x_i in enumerate(assignment):
-            idx = i + 2
-            g_1_sub.eval_i(x_i, idx)
+            idx = i + 1 + start
+            g_1_sub = g_1_sub.eval_i(x_i, idx)
         g_1 += g_1_sub
     proof.append(g_1.get_all_coefficients())
 
@@ -23,24 +23,26 @@ def prove_sumcheck(g: polynomial, v: int):
 
     # 1 < j < v round
     for j in range(1, v - 1):
-        g_j = polynomial(g.terms[:])
+        g_j = polynomial(g.terms[:], g.constant)
         assignments = generate_binary(v - j - 1)
         for i, r_i in enumerate(r):
-            idx = i + 1
+            idx = i + start
             g_j = g_j.eval_i(r_i, idx)
+        
+        res_g_j = polynomial([])
         for assignment in assignments:
-            g_j_sub = polynomial(g_j.terms[:])
-            for x_i in assignment:
-                idx = j + 1
-                g_j_sub.eval_i(x_i, idx)
-            g_j += g_j_sub
-        proof.append(g_j.get_all_coefficients())
+            g_j_sub = polynomial(g_j.terms[:], g_j.constant)
+            for k, x_i in enumerate(assignment):
+                idx = j + k + start
+                g_j_sub = g_j_sub.eval_i(x_i, idx)
+            res_g_j += g_j_sub
+        proof.append(res_g_j.get_all_coefficients())
 
         r.append(field.FQ.random())
 
-    g_v = polynomial(g.terms[:])
+    g_v = polynomial(g.terms[:], g.constant)
     for i, r_i in enumerate(r):
-        idx = i + 1
+        idx = i + start
         g_v = g_v.eval_i(r_i, idx)
     proof.append(g_v.get_all_coefficients())
 

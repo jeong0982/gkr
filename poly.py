@@ -101,6 +101,8 @@ class polynomial:
                         new_terms = []
                         result = field.FQ.zero()
                         break
+                    else:
+                        result *= subres
                 else:
                     new_terms.append(term)
             if len(new_terms) == 0:
@@ -108,7 +110,8 @@ class polynomial:
             else:
                 new_mono = monomial(result, new_terms)
                 new_terms_poly.append(new_mono)
-        return polynomial(new_terms_poly, new_constant)
+        poly = polynomial(new_terms_poly, new_constant)
+        return poly.apply_all()
 
     def is_univariate(self):
         i = 0
@@ -153,7 +156,7 @@ class polynomial:
         return list(reversed(exp.coeffs))
 
     def get_expansion(self):
-        res = expansion([], 0)
+        res = expansion([field.FQ.zero()], 0)
         for t in self.terms:
             res += t.get_expansion()
         return res
@@ -206,8 +209,8 @@ def generate_binary(bit_count) -> list[list[field.FQ]]:
 
 # univariate
 def eval_univariate(coeffs: list[field.FQ], x: field.FQ):
-    result = coeffs[len(coeffs) - 1]
-    for i in range(len(coeffs) - 2, 0, -1):
+    result = coeffs[0]
+    for i in range(1, len(coeffs)):
         result *= x
         result += coeffs[i]
     return result
@@ -225,9 +228,9 @@ def chi_w(w: list[field.FQ]):
     prod = []
     for i, w_i in enumerate(w):
         if w_i == field.FQ.zero():
-            prod.append(term(field.FQ(-1), i, field.FQ(1)))
+            prod.append(term(field.FQ(-1), i + 1, field.FQ(1)))
         elif w_i == field.FQ.one():
-            prod.append(term(field.FQ(1), i, field.FQ(0)))
+            prod.append(term(field.FQ(1), i + 1, field.FQ(0)))
     
     mono = monomial(field.FQ.one(), prod)
     return mono
