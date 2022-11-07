@@ -4,7 +4,6 @@ from typing import Callable
 
 # TODO
 # FS transform
-# separate prover and verifier
 def prove_sumcheck(g: polynomial, v: int):
     proof = []
     r = []
@@ -19,7 +18,7 @@ def prove_sumcheck(g: polynomial, v: int):
             g_1_sub.eval_i(x_i, idx)
         g_1 += g_1_sub
     proof.append(g_1.get_all_coefficients())
-    
+
     r.append(field.FQ.random()) # TODO FS
 
     # 1 < j < v round
@@ -44,6 +43,8 @@ def prove_sumcheck(g: polynomial, v: int):
         idx = i + 1
         g_v = g_v.eval_i(r_i, idx)
     proof.append(g_v.get_all_coefficients())
+
+    r.append(field.FQ.random())
 
     return proof, r
 

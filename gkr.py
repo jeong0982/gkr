@@ -1,4 +1,5 @@
 import math
+import time
 from poly import *
 from sumcheck import *
 
@@ -84,6 +85,8 @@ class Proof:
       self.z = z
 
 def prove(circuit: Circuit, D):
+    start_time = time.time()
+
     z = [[]] * circuit.depth()
     z[0] = [field.FQ.zero()] * circuit.k_i(0)
     sumcheck_proofs = []
@@ -101,6 +104,7 @@ def prove(circuit: Circuit, D):
         mult_i_ext = get_ext(circuit.mult_i(i), circuit.k_i(i) + 2 * circuit.k_i(i + 1))
         for j, r in enumerate(z[i]):
             mult_i_ext = mult_i_ext.eval_i(r, j)
+
         w_i_ext_b = get_ext_from_k(circuit.w_i(i + 1), circuit.k_i(i + 1), circuit.k_i(i) + 1)
         w_i_ext_c = get_ext_from_k(circuit.w_i(i + 1), circuit.k_i(i + 1), circuit.k_i(i) + circuit.k_i(i + 1) + 1)
 
@@ -108,11 +112,11 @@ def prove(circuit: Circuit, D):
         second = mult_i_ext * w_i_ext_b * w_i_ext_c
         f = first + second
 
-        sumcheck_proof, r = prove_sumcheck(f, circuit.layer_length(i))
+        sumcheck_proof, r = prove_sumcheck(f, circuit.layer_length(i + 1))
         sumcheck_proofs.append(sumcheck_proof)
-
-        b_star = r[0: (circuit.layer_length(i + 1) / 2)]
-        c_star = r[(circuit.layer_length(i + 1) / 2):(circuit.layer_length(i + 1))]
+ 
+        b_star = r[0: (circuit.layer_length(i + 1) // 2)]
+        c_star = r[(circuit.layer_length(i + 1) // 2):(circuit.layer_length(i + 1))]
 
         q_zero = eval_ext(circuit.w_i(i + 1), ell(b_star, c_star, field.FQ.zero()))
         q_one = eval_ext(circuit.w_i(i + 1), ell(b_star, c_star, field.FQ.one()))
@@ -120,10 +124,10 @@ def prove(circuit: Circuit, D):
 
         f_result = polynomial(f.terms)
         f_result_value = field.FQ.zero()
-        for i, x in enumerate(r):
-            if i == len(r) - 1:
+        for j, x in enumerate(r):
+            if j == len(r) - 1:
                 f_result_value = f_result.eval_univariate(x)
-            f_result = f.eval_i(x, i)
+            f_result = f.eval_i(x, j)
         
         f_res.append(f_result_value)
 
@@ -132,6 +136,7 @@ def prove(circuit: Circuit, D):
         z[i + 1] = next_r # r_(i + 1)
 
     proof = Proof(sumcheck_proofs, f_res, D, q, z)
+    print("proving time :", time.time() - start_time)
     return proof
 
 def verify(circuit: Circuit, proof: Proof):

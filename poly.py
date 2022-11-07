@@ -1,5 +1,6 @@
 from ethsnarks import field
 from typing import Callable
+from util import length_expansion
 
 class term:
     def __init__(self, coeff: field.FQ, i: int, const: field.FQ) -> None:
@@ -15,6 +16,9 @@ class term:
             return True
         else:
             return False
+    
+    def convert(self):
+        return expansion([self.const, self.coeff], 1)
 
 class monomial:
     def __init__(self, coeff: field.FQ, terms: list[term]) -> None:
@@ -27,52 +31,84 @@ class monomial:
     def __mul__(self, other):
         return monomial(self.coeff * other.coeff, self.terms + other.terms)
 
+    def apply(self):
+        res = field.FQ.one()
+        new_terms = []
+        for t in self.terms:
+            if t.coeff == field.FQ.zero():
+                if t.const == field.FQ.zero():
+                    return field.FQ.zero()
+                res *= t.const
+            else:
+                new_terms.append(t)
+        if new_terms == []:
+            return res
+        return monomial(res, new_terms)
+
     # univariate
     def eval_univariate(self, x: field.FQ):
         res = field.FQ.one()
         for t in self.terms:
-            res *= t.eval(x)
+            res_t = t.eval(x)
+            if res_t == field.FQ.zero():
+                return field.FQ.zero()
+            else:
+                res *= res_t
         return res
     
-    def derivative(self):
-        res = []
-        for i in range(len(self.terms)):
-            new_coeff = self.coeff * self.terms[i].coeff
-            new_terms = self.terms[:]
-            new_terms.pop(i)
-            if len(new_terms) == 0:
-                new_terms = [term(field.FQ.zero(), 0, field.FQ.one())]
-            new_mono = monomial(new_coeff, new_terms)
-            res.append(new_mono)
-        return res
+    def get_expansion(self):
+        res = self.terms[0].convert() * self.coeff
+        if len(self.terms) == 1:
+            return res
+        else:
+            for t in self.terms[1:]:
+                res *= t
+            return res
+
 
 class polynomial:
-    def __init__(self, terms: list[monomial]) -> None:
+    def __init__(self, terms: list[monomial], c=field.FQ.zero()) -> None:
         self.terms = terms
+        self.constant = c
 
     def __add__(self, other):
-        return polynomial(self.terms + other.terms)
+        return polynomial(self.terms + other.terms, self.constant + other.constant)
     
     def __mul__(self, other):
         new_terms = []
         for a in self.terms:
             for b in other.terms:
                 new_terms.append(a * b)
-        return polynomial(new_terms)
+        for a in self.terms:
+            if other.constant != field.FQ.zero():
+                new_terms.append(monomial(a.coeff * other.constant, a.terms))
+        for b in other.terms:
+            if self.constant != field.FQ.zero():
+                new_terms.append(monomial(b.coeff * self.constant, b.terms))
+        new_constant = self.constant * other.constant
+        return polynomial(new_terms, new_constant)
     
     def eval_i(self, x_i: field.FQ, i: int):
         new_terms_poly = []
+        new_constant = self.constant
         for mono in self.terms:
             new_terms = []
             result = mono.coeff
             for term in mono.terms:
                 if term.x_i == i:
-                    result *= term.eval(x_i)
+                    subres = term.eval(x_i)
+                    if subres == field.FQ.zero():
+                        new_terms = []
+                        result = field.FQ.zero()
+                        break
                 else:
                     new_terms.append(term)
-            new_mono = monomial(result, new_terms)
-            new_terms_poly.append(new_mono)
-        return polynomial(new_terms_poly)
+            if len(new_terms) == 0:
+                new_constant += result
+            else:
+                new_mono = monomial(result, new_terms)
+                new_terms_poly.append(new_mono)
+        return polynomial(new_terms_poly, new_constant)
 
     def is_univariate(self):
         i = 0
@@ -86,12 +122,23 @@ class polynomial:
                     else:
                         return True
 
+    def apply_all(self):
+        new_terms = []
+        new_const = self.constant
+        for t in self.terms:
+            subres = t.apply()
+            if isinstance(subres, field.FQ):
+                new_const += subres
+            else:
+                new_terms.append(subres)
+        return polynomial(new_terms, new_const)
+
     # for univariate
     def eval_univariate(self, x: field.FQ):
         res = field.FQ.zero()
         for term in self.terms:
             res += term.eval_univariate(x)
-        return res
+        return res + self.constant
 
     def get_highest_degree(self):
         highest = 0
@@ -100,30 +147,46 @@ class polynomial:
                 highest = len(term.terms)
         return highest
     
-    def derivative(self):
-        res = []
-        for term in self.terms:
-            res += term.derivative()
-        return polynomial(res)
-    
     def get_all_coefficients(self):
-        zero = field.FQ.zero()
-        
-        deg = self.get_highest_degree()
-        coeffs = [self.eval_univariate(zero)]
-        
-        d = self.derivative()
-        coeffs.append(d.eval_univariate(zero))
+        p = self.apply_all()
+        exp = p.get_expansion()
+        return list(reversed(exp.coeffs))
 
-        pi = field.FQ.one()
-        for i in range(2, deg):
-            pi *= field.FQ(i)
-            d = d.derivative()
-            coeffs.append(d.eval_univariate(zero) * field.FQ.inv(pi))
-        
-        coeffs.reverse()
-        return coeffs
-                
+    def get_expansion(self):
+        res = expansion([], 0)
+        for t in self.terms:
+            res += t.get_expansion()
+        return res
+
+class expansion:
+    def __init__(self, coeffs: list[field.FQ], deg: int) -> None:
+        self.coeffs = coeffs
+        self.deg = deg
+
+    def __add__(self, other):
+        new_coeffs = []
+        highest_deg = self.deg if self.deg >= other.deg else other.deg
+
+        a_c = length_expansion(self.coeffs, highest_deg + 1)
+        b_c = length_expansion(other.coeffs, highest_deg + 1)
+
+        for i in range(highest_deg + 1):
+            new_coeffs.append(a_c[i] + b_c[i])
+        return expansion(new_coeffs, highest_deg)
+    
+    def __mul__(self, other):
+        if isinstance(other, term):
+            m = list(map(lambda x: x * other.coeff, self.coeffs))
+            m.insert(0, field.FQ.zero())
+            m_exp = expansion(m, self.deg + 1)
+            c = list(map(lambda x: x * other.const, self.coeffs))
+            c_exp = expansion(c, self.deg)
+            return m_exp + c_exp
+        elif isinstance(other, field.FQ):
+            return expansion(list(map(lambda x: x * other, self.coeffs)), self.deg)
+        else:
+            raise NotImplementedError
+    
 
 # generate input {0, 1}^(bit_count)
 def generate_binary(bit_count) -> list[list[field.FQ]]:
