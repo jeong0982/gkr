@@ -77,8 +77,9 @@ def ell(p1: list[field.FQ], p2: list[field.FQ], t: field.FQ):
 
 
 class Proof:
-    def __init__(self, proofs, f, D, q, z) -> None:
+    def __init__(self, proofs, r, f, D, q, z) -> None:
       self.sumcheck_proofs : list[list[list[field.FQ]]] = proofs
+      self.sumcheck_r = r
       self.f = f
       self.D = D
       self.q : list[list[field.FQ]] = q
@@ -92,6 +93,7 @@ def prove(circuit: Circuit, D):
     sumcheck_proofs = []
     q = []
     f_res = []
+    sumcheck_r = []
 
     for i in range(len(z[0])):
         z[0][i] = field.FQ.random() # TODO - randomness of first value
@@ -116,20 +118,21 @@ def prove(circuit: Circuit, D):
 
         sumcheck_proof, r = prove_sumcheck(f, 2 * circuit.k_i(i + 1), start_idx)
         sumcheck_proofs.append(sumcheck_proof)
- 
-        b_star = r[0: (circuit.layer_length(i + 1) // 2)]
-        c_star = r[(circuit.layer_length(i + 1) // 2):(circuit.layer_length(i + 1))]
+        sumcheck_r.append(r)
+
+        b_star = r[0: circuit.k_i(i + 1)]
+        c_star = r[circuit.k_i(i + 1):(2 * circuit.k_i(i + 1))]
 
         q_zero = eval_ext(circuit.w_i(i + 1), ell(b_star, c_star, field.FQ.zero()))
         q_one = eval_ext(circuit.w_i(i + 1), ell(b_star, c_star, field.FQ.one()))
         q.append([q_zero, q_one])
 
-        f_result = polynomial(f.terms)
+        f_result = polynomial(f.terms, f.constant)
         f_result_value = field.FQ.zero()
         for j, x in enumerate(r):
             if j == len(r) - 1:
                 f_result_value = f_result.eval_univariate(x)
-            f_result = f.eval_i(x, j)
+            f_result = f_result.eval_i(x, j + start_idx)
         
         f_res.append(f_result_value)
 
@@ -137,7 +140,7 @@ def prove(circuit: Circuit, D):
         next_r = ell(b_star, c_star, r_star)
         z[i + 1] = next_r # r_(i + 1)
 
-    proof = Proof(sumcheck_proofs, f_res, D, q, z)
+    proof = Proof(sumcheck_proofs, sumcheck_r, f_res, D, q, z)
     print("proving time :", time.time() - start_time)
     return proof
 
@@ -146,23 +149,23 @@ def verify(circuit: Circuit, proof: Proof):
     m[0] = eval_ext(proof.D, proof.z[0])
 
     for i in range(circuit.depth() - 1):
-        valid = verify_sumcheck(m[i], proof.sumcheck_proofs[i], proof.z[i], 2 * circuit.k_i(i + 1))
+        valid = verify_sumcheck(m[i], proof.sumcheck_proofs[i], proof.sumcheck_r[i], 2 * circuit.k_i(i + 1))
         if not valid:
             return False
         else:
-            b_star = proof.z[i][0: circuit.layer_length(i + 1) // 2]
-            c_star = proof.z[i][circuit.layer_length(i + 1) // 2:int(circuit.layer_length(i + 1))]
+            b_star = proof.sumcheck_r[i][0: circuit.layer_length(i + 1) // 2]
+            c_star = proof.sumcheck_r[i][circuit.layer_length(i + 1) // 2:int(circuit.layer_length(i + 1))]
 
             q_zero = proof.q[i][0]
-            q_one = proof.q[i][0]
+            q_one = proof.q[i][1]
 
-            def modified_f():
-                return  eval_ext(circuit.add_i(i), proof.z[i] + b_star + c_star) * (q_zero + q_one) \
+            modified_f = eval_ext(circuit.add_i(i), proof.z[i] + b_star + c_star) * (q_zero + q_one) \
                         + eval_ext(circuit.mult_i(i), proof.z[i] + b_star + c_star) * (q_zero * q_one)
 
-            if proof.f[i] != modified_f():
+            if proof.f[i] != modified_f:
                 return False
             else:
+                # should be moved to prover side
                 m[i + 1] = eval_ext(circuit.w_i(i + 1), proof.z[i + 1])
     if m[circuit.depth() - 1] != eval_ext(circuit.w_i(circuit.depth() - 1), proof.z[circuit.depth() - 1]):
         return False
