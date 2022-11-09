@@ -33,7 +33,7 @@ def prove_sumcheck(g: polynomial, v: int, start: int):
         for assignment in assignments:
             g_j_sub = polynomial(g_j.terms[:], g_j.constant)
             for k, x_i in enumerate(assignment):
-                idx = j + k + start
+                idx = j + k + start + 1
                 g_j_sub = g_j_sub.eval_i(x_i, idx)
             res_g_j += g_j_sub
         proof.append(res_g_j.get_all_coefficients())

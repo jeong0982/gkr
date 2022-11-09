@@ -32,8 +32,10 @@ class monomial:
         return monomial(self.coeff * other.coeff, self.terms + other.terms)
 
     def apply(self):
-        res = field.FQ.one()
+        res = self.coeff
         new_terms = []
+        if self.coeff == field.FQ.zero():
+            return field.FQ.zero()
         for t in self.terms:
             if t.coeff == field.FQ.zero():
                 if t.const == field.FQ.zero():
@@ -47,7 +49,7 @@ class monomial:
 
     # univariate
     def eval_univariate(self, x: field.FQ):
-        res = field.FQ.one()
+        res = self.coeff
         for t in self.terms:
             res_t = t.eval(x)
             if res_t == field.FQ.zero():
@@ -110,8 +112,8 @@ class polynomial:
             else:
                 new_mono = monomial(result, new_terms)
                 new_terms_poly.append(new_mono)
-        poly = polynomial(new_terms_poly, new_constant)
-        return poly.apply_all()
+        poly = polynomial(new_terms_poly, new_constant).apply_all()
+        return poly
 
     def is_univariate(self):
         i = 0
@@ -123,7 +125,11 @@ class polynomial:
                     if i != t.x_i:
                         return False
                     else:
-                        return True
+                        continue
+        if i != 0:
+            return True
+        else:
+            return False
 
     def apply_all(self):
         new_terms = []
@@ -260,6 +266,8 @@ def get_ext(f: Callable[[list[field.FQ]], field.FQ], v: int) -> polynomial:
     ext_f = []
     for w in w_set:
         res = chi_w(w)
+        if f(w) == field.FQ.zero():
+            continue
         res.mult(f(w))
         ext_f.append(res)
     return polynomial(ext_f)
@@ -269,6 +277,8 @@ def get_ext_from_k(f: Callable[[list[field.FQ]], field.FQ], v: int, k: int) -> p
     ext_f = []
     for w in w_set:
         res = chi_w_from_k(w, k)
+        if f(w) == field.FQ.zero():
+            continue
         res.mult(f(w))
         ext_f.append(res)
     return polynomial(ext_f)
