@@ -64,6 +64,26 @@ class Circuit:
         return self.layers[i].func
 
 
+def reduce_multiple_polynomial(b: list[field.FQ], c: list[field.FQ], w: polynomial) -> list[field.FQ]:
+    assert(len(b) == len(c))
+    t = []
+    new_poly_terms = []
+    for b_i, c_i in zip(b, c):
+        new_const = b_i
+        gradient = c_i - b_i
+        t.append(term(gradient, 1, new_const))
+    
+    for mono in w.terms:
+        new_terms = []
+        for each in mono.terms:
+            new_term = t[each.x_i - 1] * each.coeff
+            new_term.const += each.const
+            new_terms.append(new_term)
+        new_poly_terms.append(monomial(mono.coeff, new_terms))
+
+    poly = polynomial(new_poly_terms, w.constant)
+    return poly.get_all_coefficients()
+
 # reduce verification at two points into verification at a single point
 def ell(p1: list[field.FQ], p2: list[field.FQ], t: field.FQ):
     consts = p1
@@ -77,13 +97,14 @@ def ell(p1: list[field.FQ], p2: list[field.FQ], t: field.FQ):
 
 
 class Proof:
-    def __init__(self, proofs, r, f, D, q, z) -> None:
+    def __init__(self, proofs, r, f, D, q, z, r_stars) -> None:
       self.sumcheck_proofs : list[list[list[field.FQ]]] = proofs
       self.sumcheck_r = r
       self.f = f
       self.D = D
       self.q : list[list[field.FQ]] = q
       self.z = z
+      self.r = r_stars
 
 def prove(circuit: Circuit, D):
     start_time = time.time()
@@ -94,6 +115,7 @@ def prove(circuit: Circuit, D):
     q = []
     f_res = []
     sumcheck_r = []
+    r_stars = []
 
     for i in range(len(z[0])):
         z[0][i] = field.FQ.random() # TODO - randomness of first value
@@ -123,9 +145,10 @@ def prove(circuit: Circuit, D):
         b_star = r[0: circuit.k_i(i + 1)]
         c_star = r[circuit.k_i(i + 1):(2 * circuit.k_i(i + 1))]
 
-        q_zero = eval_ext(circuit.w_i(i + 1), ell(b_star, c_star, field.FQ.zero()))
-        q_one = eval_ext(circuit.w_i(i + 1), ell(b_star, c_star, field.FQ.one()))
-        q.append([q_zero, q_one])
+        next_w = get_ext(circuit.w_i(i + 1), circuit.k_i(i + 1))
+        q_i = reduce_multiple_polynomial(b_star, c_star, next_w)
+
+        q.append(q_i)
 
         f_result = polynomial(f.terms, f.constant)
         f_result_value = field.FQ.zero()
@@ -139,8 +162,9 @@ def prove(circuit: Circuit, D):
         r_star = field.FQ.random()
         next_r = ell(b_star, c_star, r_star)
         z[i + 1] = next_r # r_(i + 1)
+        r_stars.append(r_star)
 
-    proof = Proof(sumcheck_proofs, sumcheck_r, f_res, D, q, z)
+    proof = Proof(sumcheck_proofs, sumcheck_r, f_res, D, q, z, r_stars)
     print("proving time :", time.time() - start_time)
     return proof
 
@@ -156,8 +180,9 @@ def verify(circuit: Circuit, proof: Proof):
             b_star = proof.sumcheck_r[i][0: circuit.layer_length(i + 1) // 2]
             c_star = proof.sumcheck_r[i][circuit.layer_length(i + 1) // 2:int(circuit.layer_length(i + 1))]
 
-            q_zero = proof.q[i][0]
-            q_one = proof.q[i][1]
+            q_i = proof.q[i]
+            q_zero = eval_univariate(q_i, field.FQ.zero())
+            q_one = eval_univariate(q_i, field.FQ.one())
 
             modified_f = eval_ext(circuit.add_i(i), proof.z[i] + b_star + c_star) * (q_zero + q_one) \
                         + eval_ext(circuit.mult_i(i), proof.z[i] + b_star + c_star) * (q_zero * q_one)
@@ -165,8 +190,7 @@ def verify(circuit: Circuit, proof: Proof):
             if proof.f[i] != modified_f:
                 return False
             else:
-                # should be moved to prover side
-                m[i + 1] = eval_ext(circuit.w_i(i + 1), proof.z[i + 1])
+                m[i + 1] = eval_univariate(q_i, proof.r[i])
     if m[circuit.depth() - 1] != eval_ext(circuit.w_i(circuit.depth() - 1), proof.z[circuit.depth() - 1]):
         return False
     return True

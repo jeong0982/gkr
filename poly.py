@@ -20,6 +20,10 @@ class term:
     def convert(self):
         return expansion([self.const, self.coeff], 1)
 
+    def __mul__(self, other):
+        if isinstance(other, field.FQ):
+            return term(self.coeff * other, self.x_i, self.const * other)
+
 class monomial:
     def __init__(self, coeff: field.FQ, terms: list[term]) -> None:
         self.terms = terms
