@@ -169,6 +169,7 @@ def prove(circuit: Circuit, D):
     return proof
 
 def verify(circuit: Circuit, proof: Proof):
+    start = time.time()
     m = [field.FQ.zero()]*circuit.depth()
     m[0] = eval_ext(proof.D, proof.z[0])
 
@@ -192,5 +193,7 @@ def verify(circuit: Circuit, proof: Proof):
             else:
                 m[i + 1] = eval_univariate(q_i, proof.r[i])
     if m[circuit.depth() - 1] != eval_ext(circuit.w_i(circuit.depth() - 1), proof.z[circuit.depth() - 1]):
+        print("verifying time :", time.time() - start)
         return False
+    print("verifying time :", time.time() - start)
     return True
