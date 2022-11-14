@@ -110,4 +110,4 @@ def D_func(arr):
     return field.FQ(6)
 
 proof = prove(c, D_func)
-print(verify(c, proof))
+print(verify(proof))

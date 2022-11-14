@@ -18,7 +18,7 @@ class term:
             return False
     
     def convert(self):
-        return expansion([self.const, self.coeff], 1)
+        return UnivariateExpansion([self.const, self.coeff], 1)
 
     def __mul__(self, other):
         if isinstance(other, field.FQ):
@@ -166,12 +166,12 @@ class polynomial:
         return list(reversed(exp.coeffs))
 
     def get_expansion(self):
-        res = expansion([field.FQ.zero()], 0)
+        res = UnivariateExpansion([field.FQ.zero()], 0)
         for t in self.terms:
             res += t.get_expansion()
         return res
 
-class expansion:
+class UnivariateExpansion:
     def __init__(self, coeffs: list[field.FQ], deg: int) -> None:
         self.coeffs = coeffs
         self.deg = deg
@@ -185,21 +185,47 @@ class expansion:
 
         for i in range(highest_deg + 1):
             new_coeffs.append(a_c[i] + b_c[i])
-        return expansion(new_coeffs, highest_deg)
+        return UnivariateExpansion(new_coeffs, highest_deg)
     
     def __mul__(self, other):
         if isinstance(other, term):
             m = list(map(lambda x: x * other.coeff, self.coeffs))
             m.insert(0, field.FQ.zero())
-            m_exp = expansion(m, self.deg + 1)
+            m_exp = UnivariateExpansion(m, self.deg + 1)
             c = list(map(lambda x: x * other.const, self.coeffs))
-            c_exp = expansion(c, self.deg)
+            c_exp = UnivariateExpansion(c, self.deg)
             return m_exp + c_exp
         elif isinstance(other, field.FQ):
-            return expansion(list(map(lambda x: x * other, self.coeffs)), self.deg)
+            return UnivariateExpansion(list(map(lambda x: x * other, self.coeffs)), self.deg)
         else:
             raise NotImplementedError
+
+# [[coeff, deg(x_1), ... , deg(x_v)], ...]
+class MultivariateExpansion:
+    def __init__(self, terms: list[list[field.FQ]], v: int) -> None:
+        self.terms = terms
+        self.v = v
     
+    def __mul__(self, other):
+        if isinstance(other, term):
+            res = []
+            for t in self.terms:
+                new_t1 = t[:]
+                i = other.x_i
+                new_t1[i] += 1
+                new_t1[0] *= other.coeff
+                res.append(new_t1)
+
+                new_t2 = t[:]
+                new_t2[0] *= other.const
+                res.append(new_t2)
+            return MultivariateExpansion(res, self.v)
+    
+    def __add__(self, other):
+        if isinstance(other, MultivariateExpansion):
+            assert (self.v == other.v)
+            return MultivariateExpansion(self.terms + other.terms, self.v)
+
 
 # generate input {0, 1}^(bit_count)
 def generate_binary(bit_count) -> list[list[field.FQ]]:
@@ -263,6 +289,49 @@ def eval_ext(f: Callable[[list[field.FQ]], field.FQ], r: list[field.FQ]):
     for w_i in w:
         acc += f(w_i) * chi(w_i, r)
     return acc
+
+def eval_expansion(f: list[list[field.FQ]], r: list[field.FQ]) -> field.FQ:
+    assert (len(r) + 1 == len(f[0]))
+    res = field.FQ.zero()
+    for t in f:
+        subres = field.FQ.zero()
+        for i, x in enumerate(t):
+            if i == 0:
+                subres = t[0]
+            else:
+                subres *= r[i - 1] ** x
+        res += subres
+    return res
+
+# return expansion of multivariate polynomial
+def get_multi_ext(f: Callable[[list[field.FQ]], field.FQ], v: int) -> list[list[field.FQ]]:
+    w_set = generate_binary(v)
+    ext_f = []
+    res = []
+    for w in w_set:
+        res = chi_w(w)
+        if f(w) == field.FQ.zero():
+            continue
+        res.mult(f(w))
+        ext_f.append(res)
+    g = []
+    empty_term = [field.FQ.zero()] * (v + 1)
+    for term in ext_f:
+        subres = MultivariateExpansion([], v)
+        for t in term.terms:
+            if len(subres.terms) == 0:
+                t_expansion1 = empty_term[:]
+                t_expansion1[t.x_i] = field.FQ.one()
+                t_expansion1[0] = term.coeff * t.coeff
+                t_expansion2 = empty_term[:]
+                t_expansion2[0] = t.const * term.coeff
+                subres = MultivariateExpansion([t_expansion1, t_expansion2], v)
+            else:
+                subres = subres * t
+        g += subres.terms
+    if len(g) == 0:
+        g = [empty_term]
+    return g
 
 # r : {0, 1}^v
 def get_ext(f: Callable[[list[field.FQ]], field.FQ], v: int) -> polynomial:

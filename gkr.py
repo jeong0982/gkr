@@ -97,18 +97,26 @@ def ell(p1: list[field.FQ], p2: list[field.FQ], t: field.FQ):
 
 
 class Proof:
-    def __init__(self, proofs, r, f, D, q, z, r_stars) -> None:
+    def __init__(self, proofs, r, f, D, q, z, r_stars, d, w, adds, mults, k) -> None:
       self.sumcheck_proofs : list[list[list[field.FQ]]] = proofs
-      self.sumcheck_r = r
-      self.f = f
-      self.D = D
+      self.sumcheck_r : list[list[field.FQ]] = r
+      self.f : list[field.FQ] = f
+      self.D : list[list[field.FQ]] = D
       self.q : list[list[field.FQ]] = q
-      self.z = z
-      self.r = r_stars
+      self.z : list[list[field.FQ]] = z
+      self.r : list[field.FQ] = r_stars
+
+      # circuit info
+      self.d : int = d
+      self.input_func : list[list[field.FQ]] = w
+      self.add : list[list[list[field.FQ]]] = adds
+      self.mult : list[list[list[field.FQ]]] = mults
+      self.k : list[int] = k
 
 def prove(circuit: Circuit, D):
     start_time = time.time()
 
+    D_poly = get_multi_ext(D, circuit.k_i(0))
     z = [[]] * circuit.depth()
     z[0] = [field.FQ.zero()] * circuit.k_i(0)
     sumcheck_proofs = []
@@ -164,35 +172,44 @@ def prove(circuit: Circuit, D):
         z[i + 1] = next_r # r_(i + 1)
         r_stars.append(r_star)
 
-    proof = Proof(sumcheck_proofs, sumcheck_r, f_res, D, q, z, r_stars)
+    w_input = get_multi_ext(circuit.w_i(circuit.depth() - 1), circuit.k_i(circuit.depth() - 1))
+    adds = []
+    mults = []
+    k = []
+    for i in range(circuit.depth() - 1):
+        adds.append(get_multi_ext(circuit.add_i(i), circuit.k_i(i) + 2 * circuit.k_i(i + 1)))
+        mults.append(get_multi_ext(circuit.mult_i(i), circuit.k_i(i) + 2 * circuit.k_i(i + 1)))
+        k.append(circuit.k_i(i))
+    k.append(circuit.k_i(circuit.depth() - 1))
+    proof = Proof(sumcheck_proofs, sumcheck_r, f_res, D_poly, q, z, r_stars, circuit.depth(), w_input, adds, mults, k)
     print("proving time :", time.time() - start_time)
     return proof
 
-def verify(circuit: Circuit, proof: Proof):
+def verify(proof: Proof):
     start = time.time()
-    m = [field.FQ.zero()]*circuit.depth()
-    m[0] = eval_ext(proof.D, proof.z[0])
+    m = [field.FQ.zero()]*proof.d
+    m[0] = eval_expansion(proof.D, proof.z[0])
 
-    for i in range(circuit.depth() - 1):
-        valid = verify_sumcheck(m[i], proof.sumcheck_proofs[i], proof.sumcheck_r[i], 2 * circuit.k_i(i + 1))
+    for i in range(proof.d - 1):
+        valid = verify_sumcheck(m[i], proof.sumcheck_proofs[i], proof.sumcheck_r[i], 2 * proof.k[i + 1])
         if not valid:
             return False
         else:
-            b_star = proof.sumcheck_r[i][0: circuit.layer_length(i + 1) // 2]
-            c_star = proof.sumcheck_r[i][circuit.layer_length(i + 1) // 2:int(circuit.layer_length(i + 1))]
+            b_star = proof.sumcheck_r[i][0: 2 ** (proof.k[i + 1] - 1)]
+            c_star = proof.sumcheck_r[i][2 ** (proof.k[i + 1] - 1) : 2 ** (proof.k[i + 1])]
 
             q_i = proof.q[i]
             q_zero = eval_univariate(q_i, field.FQ.zero())
             q_one = eval_univariate(q_i, field.FQ.one())
 
-            modified_f = eval_ext(circuit.add_i(i), proof.z[i] + b_star + c_star) * (q_zero + q_one) \
-                        + eval_ext(circuit.mult_i(i), proof.z[i] + b_star + c_star) * (q_zero * q_one)
+            modified_f = eval_expansion(proof.add[i], proof.z[i] + b_star + c_star) * (q_zero + q_one) \
+                        + eval_expansion(proof.mult[i], proof.z[i] + b_star + c_star) * (q_zero * q_one)
 
             if proof.f[i] != modified_f:
                 return False
             else:
                 m[i + 1] = eval_univariate(q_i, proof.r[i])
-    if m[circuit.depth() - 1] != eval_ext(circuit.w_i(circuit.depth() - 1), proof.z[circuit.depth() - 1]):
+    if m[proof.d - 1] != eval_expansion(proof.input_func, proof.z[proof.d - 1]):
         print("verifying time :", time.time() - start)
         return False
     print("verifying time :", time.time() - start)
