@@ -1,9 +1,8 @@
 from poly import *
 from util import *
 from typing import Callable
+from ethsnarks import mimc
 
-# TODO
-# FS transform
 def prove_sumcheck(g: polynomial, v: int, start: int):
     proof = []
     r = []
@@ -19,7 +18,8 @@ def prove_sumcheck(g: polynomial, v: int, start: int):
         g_1 += g_1_sub
     proof.append(g_1.get_all_coefficients())
 
-    r.append(field.FQ.random()) # TODO FS
+    r_1 = field.FQ(mimc.mimc_hash(list(map(lambda x : int(x), g_1.get_all_coefficients()))))
+    r.append(r_1)
 
     # 1 < j < v round
     for j in range(1, v - 1):
@@ -38,7 +38,8 @@ def prove_sumcheck(g: polynomial, v: int, start: int):
             res_g_j += g_j_sub
         proof.append(res_g_j.get_all_coefficients())
 
-        r.append(field.FQ.random())
+        r_n = field.FQ(mimc.mimc_hash(list(map(lambda x : int(x), proof[len(proof) - 1]))))
+        r.append(r_n)
 
     g_v = polynomial(g.terms[:], g.constant)
     for i, r_i in enumerate(r):
@@ -46,7 +47,8 @@ def prove_sumcheck(g: polynomial, v: int, start: int):
         g_v = g_v.eval_i(r_i, idx)
     proof.append(g_v.get_all_coefficients())
 
-    r.append(field.FQ.random())
+    r_v = field.FQ(mimc.mimc_hash(list(map(lambda x : int(x), proof[len(proof) - 1]))))
+    r.append(r_v)
 
     return proof, r
 
@@ -61,7 +63,8 @@ def verify_sumcheck(claim: field.FQ, proof: list[list[field.FQ]], r, v: int):
 
         if q_zero + q_one != expected:
             return False
-
+        if field.FQ(mimc.mimc_hash(list(map(lambda x : int(x), proof[i])))) != r[i]:
+            return False
         expected = eval_univariate(proof[i], r[i])
 
     return True

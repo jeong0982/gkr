@@ -126,7 +126,7 @@ def prove(circuit: Circuit, D):
     r_stars = []
 
     for i in range(len(z[0])):
-        z[0][i] = field.FQ.random() # TODO - randomness of first value
+        z[0][i] = field.FQ.random() # This initial value is unsafe
 
     for i in range(circuit.depth() - 1):
         add_i_ext = get_ext(circuit.add_i(i), circuit.k_i(i) + 2 * circuit.k_i(i + 1))
@@ -167,7 +167,7 @@ def prove(circuit: Circuit, D):
         
         f_res.append(f_result_value)
 
-        r_star = field.FQ.random()
+        r_star = field.FQ(mimc.mimc_hash(list(map(lambda x : int(x), sumcheck_proof[len(sumcheck_proof) - 1]))))
         next_r = ell(b_star, c_star, r_star)
         z[i + 1] = next_r # r_(i + 1)
         r_stars.append(r_star)
@@ -205,7 +205,11 @@ def verify(proof: Proof):
             modified_f = eval_expansion(proof.add[i], proof.z[i] + b_star + c_star) * (q_zero + q_one) \
                         + eval_expansion(proof.mult[i], proof.z[i] + b_star + c_star) * (q_zero * q_one)
 
-            if proof.f[i] != modified_f:
+            sumcheck_p = proof.sumcheck_proofs[i]
+            sumcheck_p_hash = field.FQ(mimc.mimc_hash(list(map(lambda x : int(x), sumcheck_p[len(sumcheck_p) - 1]))))
+
+            if (proof.f[i] != modified_f) or (sumcheck_p_hash != proof.r[i]):
+                print("verifying time :", time.time() - start)
                 return False
             else:
                 m[i + 1] = eval_univariate(q_i, proof.r[i])
