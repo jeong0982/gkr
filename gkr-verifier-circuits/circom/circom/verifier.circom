@@ -1,11 +1,9 @@
-pragma circom 2.1.0;
-include "./poly/univariate.circom"
-include "./poly/multivariate.circom"
-include "./sumcheck/sumcheckVerify.circom"
+pragma circom 2.0.4;
 
-template VerifyLayer() {
+include "./poly/univariate.circom";
+include "./poly/multivariate.circom";
+include "./sumcheck/sumcheckVerify.circom";
 
-}
 
 template VerifyGKR(meta) {
     // metadata of circuit
@@ -120,7 +118,7 @@ template VerifyGKR(meta) {
             inputValue.x[j] <== z[d - 1][j];
         }
     }
-    m[d - 1].result === inputValue.result
+    m[d - 1].result === inputValue.result;
 
     isValid <== 1;
 }

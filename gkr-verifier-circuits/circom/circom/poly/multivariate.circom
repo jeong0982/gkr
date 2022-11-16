@@ -1,4 +1,4 @@
-pragma circom 2.1.0;
+pragma circom 2.0.4;
 
 template evalMultivariate(nTerms, v) {
     signal input x[v];
@@ -21,5 +21,5 @@ template evalMultivariate(nTerms, v) {
             subres[i] <== subres[i - 1] + termres[i][v];
         }
     }
-    output <== subres[nTerms - 1];
+    result <== subres[nTerms - 1];
 }
