@@ -195,15 +195,12 @@ def verify(proof: Proof):
         if not valid:
             return False
         else:
-            b_star = proof.sumcheck_r[i][0: 2 ** (proof.k[i + 1] - 1)]
-            c_star = proof.sumcheck_r[i][2 ** (proof.k[i + 1] - 1) : 2 ** (proof.k[i + 1])]
-
             q_i = proof.q[i]
             q_zero = eval_univariate(q_i, field.FQ.zero())
             q_one = eval_univariate(q_i, field.FQ.one())
 
-            modified_f = eval_expansion(proof.add[i], proof.z[i] + b_star + c_star) * (q_zero + q_one) \
-                        + eval_expansion(proof.mult[i], proof.z[i] + b_star + c_star) * (q_zero * q_one)
+            modified_f = eval_expansion(proof.add[i], proof.z[i] + proof.sumcheck_r[i]) * (q_zero + q_one) \
+                        + eval_expansion(proof.mult[i], proof.z[i] + proof.sumcheck_r[i]) * (q_zero * q_one)
 
             sumcheck_p = proof.sumcheck_proofs[i]
             sumcheck_p_hash = field.FQ(mimc.mimc_hash(list(map(lambda x : int(x), sumcheck_p[len(sumcheck_p) - 1]))))
