@@ -12,7 +12,7 @@ template evalMultivariate(nTerms, v) {
             if (j == 0) {
                 termres[i][0] <== terms[i][0];
             } else {
-                termres[i][j] <-- termres[i][j - 1] * (x[j - 1] ** term[i][j]);
+                termres[i][j] <-- termres[i][j - 1] * (x[j - 1] ** terms[i][j]);
             }
         }
         if (i == 0) {
