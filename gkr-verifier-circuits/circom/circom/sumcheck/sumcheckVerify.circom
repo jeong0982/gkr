@@ -1,4 +1,5 @@
 pragma circom 2.1.0;
+include "../poly/univariate.circom"
 
 template SumcheckVerify(v, nTerms) {
     signal input proofs[v][nTerms];

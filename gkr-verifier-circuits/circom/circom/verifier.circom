@@ -1,5 +1,7 @@
 pragma circom 2.1.0;
-include "./verifyLayer.circom"
+include "./poly/univariate.circom"
+include "./poly/multivariate.circom"
+include "./sumcheck/sumcheckVerify.circom"
 
 template VerifyLayer() {
 
