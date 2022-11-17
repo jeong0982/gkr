@@ -1,5 +1,6 @@
 import math
 import time
+import json
 from poly import *
 from sumcheck import *
 
@@ -112,6 +113,22 @@ class Proof:
       self.add : list[list[list[field.FQ]]] = adds
       self.mult : list[list[list[field.FQ]]] = mults
       self.k : list[int] = k
+
+    def to_dict(self):
+        to_serialize = dict()
+        to_serialize['sumcheckProof'] = list(map(lambda x: list(map(lambda y: list(map(lambda z: repr(z), y)), x)), self.sumcheck_proofs))
+        to_serialize['sumcheckr'] = list(map(lambda x: list(map(lambda y: repr(y), x)), self.sumcheck_r))
+        to_serialize['f'] = list(map(lambda x: repr(x), self.f))
+        to_serialize['q'] = list(map(lambda x: list(map(lambda y: repr(y), x)), self.q))
+        to_serialize['z'] = list(map(lambda x: list(map(lambda y: repr(y), x)), self.z))
+        to_serialize['D'] = list(map(lambda x: list(map(lambda y: repr(y), x)), self.D))
+        to_serialize['r'] = list(map(lambda x: repr(x), self.r))
+        to_serialize['inputFunc'] = list(map(lambda x: list(map(lambda y: repr(y), x)), self.input_func))
+        to_serialize['add'] = list(map(lambda x: list(map(lambda y: list(map(lambda z: repr(z), y)), x)), self.add))
+        to_serialize['mult'] = list(map(lambda x: list(map(lambda y: list(map(lambda z: repr(z), y)), x)), self.mult))
+        return to_serialize
+
+        
 
 def prove(circuit: Circuit, D):
     start_time = time.time()
