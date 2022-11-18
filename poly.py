@@ -314,7 +314,10 @@ def get_multi_ext(f: Callable[[list[field.FQ]], field.FQ], v: int) -> list[list[
             continue
         res.mult(f(w))
         ext_f.append(res)
+
     g = []
+    term_pool = dict()
+
     empty_term = [field.FQ.zero()] * (v + 1)
     for term in ext_f:
         subres = MultivariateExpansion([], v)
@@ -328,10 +331,21 @@ def get_multi_ext(f: Callable[[list[field.FQ]], field.FQ], v: int) -> list[list[
                 subres = MultivariateExpansion([t_expansion1, t_expansion2], v)
             else:
                 subres = subres * t
-        g += subres.terms
+        for one_term in subres.terms:
+            if tuple(one_term[1:]) in term_pool:
+                idx = term_pool[tuple(one_term[1:])]
+                g[idx][0] += one_term[0]
+            else:
+                term_pool[tuple(one_term[1:])] = len(g)
+                g.append(one_term)
     if len(g) == 0:
         g = [empty_term]
-    return g
+        return g
+    g_final = []
+    for term in g:
+        if term[0] != field.FQ.zero():
+            g_final.append(term)
+    return g_final
 
 # r : {0, 1}^v
 def get_ext(f: Callable[[list[field.FQ]], field.FQ], v: int) -> polynomial:

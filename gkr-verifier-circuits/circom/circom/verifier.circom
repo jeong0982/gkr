@@ -144,5 +144,5 @@ template VerifyGKR(meta) {
 }
 
 component main = VerifyGKR([
-    3, 2, 1, 4, 3, 3, 16, 2, 7, 7, 1, 2, 2
+    3, 2, 1, 4, 3, 3, 3, 2, 2, 51, 1, 2, 2
 ]);
