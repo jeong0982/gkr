@@ -70,4 +70,3 @@ def modify_proof_for_circom(proof: Proof):
         new_mult.append(new_mult_i)
     
     return Proof(new_sumcheck_proofs, new_sumcheck_r, proof.f, proof.D, new_q, new_z, proof.r, proof.d, proof.input_func, new_add, new_mult, proof.k)
-    

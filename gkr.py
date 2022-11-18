@@ -128,8 +128,6 @@ class Proof:
         to_serialize['mult'] = list(map(lambda x: list(map(lambda y: list(map(lambda z: repr(z), y)), x)), self.mult))
         return to_serialize
 
-        
-
 def prove(circuit: Circuit, D):
     start_time = time.time()
 
