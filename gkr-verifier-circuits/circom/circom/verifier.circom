@@ -17,6 +17,7 @@ template VerifyGKR(meta) {
     // 7 --> k_i(d - 1)
     // 8 --> largest # of terms among add_i
     // 9 --> largest # of terms among mult_i
+    // 10 ~ 10 + d - 1 : i --> k_i(i - 10)
     var d = meta[0];
     var largest_k = meta[1];
 
@@ -60,17 +61,17 @@ template VerifyGKR(meta) {
     component inputValue = evalMultivariate(meta[6], meta[7]);
 
     for (var i = 0; i < d - 1; i++) {
-        sumcheckVerifier[i] = SumcheckVerify(2 * largest_k, meta[4]);
+        sumcheckVerifier[i] = SumcheckVerify(2 * meta[i + 11], meta[4]);
         if (i == 0) {
             sumcheckVerifier[i].claim <== mInitial.result;
         } else {
             sumcheckVerifier[i].claim <== m[i - 1].result;
         }
         
-        for (var j = 0; j < 2 * largest_k - 1; j++) {
+        for (var j = 0; j < 2 * meta[i + 11] - 1; j++) {
             sumcheckVerifier[i].r[j] <== sumcheckr[i][j];
         }
-        for (var j = 0; j < 2 * largest_k; j++) {
+        for (var j = 0; j < 2 * meta[i + 11]; j++) {
             for (var k = 0; k < meta[4]; k++) {
                 sumcheckVerifier[i].proofs[j][k] <== sumcheckProof[i][j][k];
             }
@@ -89,32 +90,32 @@ template VerifyGKR(meta) {
             qOne[i].coeffs[j] <== q[i][j];
         }
 
-        addR[i] = evalMultivariate(meta[8], 3 * largest_k);
-        multR[i] = evalMultivariate(meta[8], 3 * largest_k);
+        addR[i] = evalMultivariate(meta[8], meta[i + 10] + 2 * meta[i + 11]);
+        multR[i] = evalMultivariate(meta[8], meta[i + 10] + 2 * meta[i + 11]);
 
         for (var j = 0; j < meta[8]; j++) {
-            for (var k = 0; k < 3 * largest_k + 1; k++) {
+            for (var k = 0; k < meta[i + 10] + 2 * meta[i + 11] + 1; k++) {
                 addR[i].terms[j][k] <== add[i][j][k];
             }
         }
-        for (var k = 0; k < 3 * largest_k; k++) {
-            if (k < largest_k) {
+        for (var k = 0; k < meta[i + 10] + 2 * meta[i + 11]; k++) {
+            if (k < meta[i + 10]) {
                 addR[i].x[k] <== z[i][k];
             } else {
-                addR[i].x[k] <== sumcheckr[i][k - largest_k];
+                addR[i].x[k] <== sumcheckr[i][k - meta[i + 10]];
             }
         }
 
         for (var j = 0; j < meta[9]; j++) {
-            for (var k = 0; k < 3 * largest_k + 1; k++) {
+            for (var k = 0; k < meta[i + 10] + 2 * meta[i + 11] + 1; k++) {
                 multR[i].terms[j][k] <== mult[i][j][k];
             }
         }
-        for (var k = 0; k < 3 * largest_k; k++) {
-            if (k < largest_k) {
+        for (var k = 0; k < meta[i + 10] + 2 * meta[i + 11]; k++) {
+            if (k < meta[i + 10]) {
                 multR[i].x[k] <== z[i][k];
             } else {
-                multR[i].x[k] <== sumcheckr[i][k - largest_k];
+                multR[i].x[k] <== sumcheckr[i][k - meta[i + 10]];
             }
         }
         multinter[i] <== qZero[i].result * qOne[i].result;
@@ -143,5 +144,5 @@ template VerifyGKR(meta) {
 }
 
 component main = VerifyGKR([
-    3, 2, 1, 4, 3, 3, 16, 2, 7, 7
+    3, 2, 1, 4, 3, 3, 16, 2, 7, 7, 1, 2, 2
 ]);
