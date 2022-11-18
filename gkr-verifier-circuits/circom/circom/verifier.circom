@@ -91,7 +91,7 @@ template VerifyGKR(meta) {
         }
 
         addR[i] = evalMultivariate(meta[8], meta[i + 10] + 2 * meta[i + 11]);
-        multR[i] = evalMultivariate(meta[8], meta[i + 10] + 2 * meta[i + 11]);
+        multR[i] = evalMultivariate(meta[9], meta[i + 10] + 2 * meta[i + 11]);
 
         for (var j = 0; j < meta[8]; j++) {
             for (var k = 0; k < meta[i + 10] + 2 * meta[i + 11] + 1; k++) {
@@ -144,5 +144,5 @@ template VerifyGKR(meta) {
 }
 
 component main = VerifyGKR([
-    3, 2, 1, 4, 3, 3, 3, 2, 2, 51, 1, 2, 2
+    3, 2, 1, 2, 3, 3, 3, 2, 1, 51, 1, 2, 2
 ]);
