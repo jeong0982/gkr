@@ -83,7 +83,7 @@ template VerifyGKR(meta) {
         qOne[i] = evalUnivariate(meta[5]);
 
         qZero[i].x <== 0;
-        qOne[i].x <== 0;
+        qOne[i].x <== 1;
 
         for (var j = 0; j < meta[5]; j++) {
             qZero[i].coeffs[j] <== q[i][j];

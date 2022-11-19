@@ -4,3 +4,4 @@
 /__pycache__
 *.r1cs
 *.json
+*.ptau
