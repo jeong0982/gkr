@@ -1,6 +1,5 @@
 import math
 import time
-import json
 from poly import *
 from sumcheck import *
 

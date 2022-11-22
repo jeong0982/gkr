@@ -1,4 +1,6 @@
 from gkr import *
+from genjson import *
+
 zero = field.FQ.zero()
 one = field.FQ.one()
 
@@ -110,4 +112,5 @@ def D_func(arr):
     return field.FQ(6)
 
 proof = prove(c, D_func)
+# generate_json(proof)
 print(verify(proof))
