@@ -1,0 +1,12 @@
+[package]
+name = "gkr"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+dag = { git = "https://github.com/jeong0982/circom" }
+parser = { git = "https://github.com/jeong0982/circom" }
+constraint_generation = { git = "https://github.com/jeong0982/circom" }
+bellman = "0.13.0"
