@@ -9,4 +9,7 @@ edition = "2021"
 dag = { git = "https://github.com/jeong0982/circom" }
 parser = { git = "https://github.com/jeong0982/circom" }
 constraint_generation = { git = "https://github.com/jeong0982/circom" }
-bellman = "0.13.0"
+
+# field element
+halo2curves = { git = "https://github.com/privacy-scaling-explorations/halo2curves" }
+ff = "0.12"
