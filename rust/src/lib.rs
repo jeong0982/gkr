@@ -4,7 +4,10 @@ use ff::PrimeField;
 pub mod gkr;
 mod parser;
 
-pub fn gen_proof<S: PrimeField>(file: String) -> Result<gkr::Proof<S>, ()> {
+pub fn gen_proof<S: PrimeField>(file: String) -> Result<gkr::Proof<S>, ()>
+where
+    <S as PrimeField>::Repr: AsRef<[u64]>,
+{
     let _dag = parse_circom(file);
     // circuit = convert_dag_circuit(dag)
     let circuit = gkr::GKRCircuit { layer: vec![] };
@@ -17,7 +20,6 @@ mod tests {
 
     #[test]
     fn test_dag() {
-        let dag = parse_circom(String::from("test.circom"));
-        print!("{}", dag.prime);
+        let _dag = parse_circom(String::from("test.circom"));
     }
 }

@@ -12,4 +12,4 @@ constraint_generation = { git = "https://github.com/jeong0982/circom" }
 
 # field element
 halo2curves = { git = "https://github.com/privacy-scaling-explorations/halo2curves" }
-ff = "0.12"
+ff = { git = "https://github.com/zkcrypto/ff" }

@@ -1,4 +1,6 @@
+pub mod poly;
 pub mod prover;
+pub mod sumcheck;
 
 use ff::PrimeField;
 
@@ -34,4 +36,26 @@ pub struct Layer<S: PrimeField> {
 
 pub struct GKRCircuit<S: PrimeField> {
     pub layer: Vec<Layer<S>>,
+}
+
+impl<S: PrimeField> GKRCircuit<S> {
+    pub fn depth(&self) -> usize {
+        self.layer.len()
+    }
+
+    pub fn add(&self, i: usize) -> Vec<Vec<S>> {
+        self.layer[i].add.clone()
+    }
+
+    pub fn mult(&self, i: usize) -> Vec<Vec<S>> {
+        self.layer[i].mult.clone()
+    }
+
+    pub fn w(&self, i: usize) -> Vec<Vec<S>> {
+        self.layer[i].w.clone()
+    }
+
+    pub fn k(&self, i: usize) -> usize {
+        self.layer[i].k
+    }
 }
