@@ -5,7 +5,7 @@ use mimc_rs::{Fr, FrRepr, Mimc7};
 
 use super::poly::*;
 
-fn convert_s_to_fr<S>(v: &S) -> mimc_rs::Fr
+pub fn convert_s_to_fr<S>(v: &S) -> mimc_rs::Fr
 where
     S: PrimeField<Repr = [u8; 32]>,
 {
@@ -14,13 +14,13 @@ where
     mimc_rs::Fr::from_repr(res).unwrap()
 }
 
-fn convert_fr_to_s<S: PrimeField<Repr = [u8; 32]>>(v: mimc_rs::Fr) -> S {
+pub fn convert_fr_to_s<S: PrimeField<Repr = [u8; 32]>>(v: mimc_rs::Fr) -> S {
     let FrRepr(v_bytes) = v.to_repr();
     S::from_repr(v_bytes).unwrap()
 }
 
 pub fn prove_sumcheck<S: PrimeField<Repr = [u8; 32]>>(
-    g: Vec<Vec<S>>,
+    g: &Vec<Vec<S>>,
     v: usize,
 ) -> (Vec<Vec<S>>, Vec<S>) {
     let mimc = Mimc7::new(91);

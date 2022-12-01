@@ -77,6 +77,15 @@ pub fn partial_eval<S: PrimeField<Repr = [u8; 32]>>(f: Vec<Vec<S>>, r: &Vec<S>) 
     res_f
 }
 
+pub fn eval_univariate<S: PrimeField<Repr = [u8; 32]>>(f: Vec<S>, x: &S) -> S {
+    let mut res = f[0];
+    for i in 1..f.len() {
+        res *= x;
+        res += f[i];
+    }
+    res
+}
+
 pub fn modify_poly_from_k<S: PrimeField>(f: Vec<Vec<S>>, k: usize) -> Vec<Vec<S>> {
     let mut res_f = vec![];
     for t in f.iter() {
