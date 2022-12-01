@@ -13,3 +13,7 @@ constraint_generation = { git = "https://github.com/jeong0982/circom" }
 # field element
 halo2curves = { git = "https://github.com/privacy-scaling-explorations/halo2curves" }
 ff = { git = "https://github.com/zkcrypto/ff" }
+ethers-core = "0.17.0"
+
+# MiMC
+mimc-rs = { git = "https://github.com/jeong0982/mimc-rs" }

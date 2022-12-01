@@ -1,5 +1,13 @@
+use ethers_core::types::U256;
 use ff::PrimeField;
 use std::vec;
+
+fn fe_to_u256<F>(f: F) -> U256
+where
+    F: PrimeField<Repr = [u8; 32]>,
+{
+    U256::from_little_endian(f.to_repr().as_ref())
+}
 
 pub fn get_empty<S: PrimeField>(l: usize) -> Vec<Vec<S>> {
     vec![vec![S::ZERO; l + 1]; 1]
@@ -26,15 +34,20 @@ pub fn generate_binary<S: PrimeField>(l: usize) -> Vec<Vec<S>> {
     genbin(l, 0, Vec::from(empty))
 }
 
-pub fn partial_eval_i<S: PrimeField>(f: Vec<Vec<S>>, x: S, i: usize) -> Vec<Vec<S>>
-where
-    <S as PrimeField>::Repr: AsRef<[u64]>,
-{
+pub fn partial_eval_i<S: PrimeField<Repr = [u8; 32]>>(
+    f: Vec<Vec<S>>,
+    x: &S,
+    i: usize,
+) -> Vec<Vec<S>> {
     let mut res_f = vec![];
     for t in f.iter() {
         let mut new_t = t.clone();
-        let exp = S::to_repr(&t[i]);
-        let constant = t[0] * (x.pow(exp));
+        let exp = fe_to_u256(t[i]).as_usize();
+        let mut x_pow = x.clone();
+        for _ in 0..exp {
+            x_pow *= x;
+        }
+        let constant = t[0] * x_pow;
         new_t[0] = constant;
         new_t[i] = S::ZERO;
         res_f.push(new_t);
@@ -42,18 +55,20 @@ where
     res_f
 }
 
-pub fn partial_eval<S: PrimeField>(f: Vec<Vec<S>>, r: &Vec<S>) -> Vec<Vec<S>>
-where
-    <S as PrimeField>::Repr: AsRef<[u64]>,
-{
+pub fn partial_eval<S: PrimeField<Repr = [u8; 32]>>(f: Vec<Vec<S>>, r: &Vec<S>) -> Vec<Vec<S>> {
     assert!(f[0].len() > r.len());
     let mut res_f = vec![];
     for t in f.iter() {
         let mut new_t = vec![];
         let mut constant = t[0];
         for i in 0..r.len() - 1 {
-            let x = S::to_repr(&t[i]);
-            constant *= r[i].pow(x);
+            let x = fe_to_u256(t[i]).as_usize();
+            if x == 0 {
+                continue;
+            }
+            for _ in 0..x {
+                constant *= r[i];
+            }
         }
         new_t.push(constant);
         new_t.extend_from_slice(&t[r.len() + 1..]);
@@ -131,13 +146,16 @@ pub fn mult_poly<S: PrimeField>(f1: &Vec<Vec<S>>, f2: &Vec<Vec<S>>) -> Vec<Vec<S
     res
 }
 
-// pub fn get_univariate_coeff<S: PrimeField>(f: Vec<Vec<S>>, i: usize) -> Vec<S> {
-//     let mut coeffs = vec![];
-//     for t in f {
-//         let deg = t[i];
-//         if coeffs.len() < deg {
-            
-//         }
-//     }
-//     coeffs
-// }
+pub fn get_univariate_coeff<S: PrimeField<Repr = [u8; 32]>>(f: Vec<Vec<S>>, i: usize) -> Vec<S> {
+    let mut coeffs = vec![];
+    for t in f {
+        let deg_u256 = fe_to_u256(t[i]);
+        let deg = deg_u256.as_usize();
+        if coeffs.len() + 1 < deg {
+            let mut acc = vec![S::ZERO; deg - coeffs.len()];
+            coeffs.append(&mut acc);
+        }
+        coeffs[deg] += t[0];
+    }
+    coeffs
+}
