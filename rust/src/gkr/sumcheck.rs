@@ -33,11 +33,11 @@ pub fn prove_sumcheck<S: PrimeField<Repr = [u8; 32]>>(
         let mut g_1_sub = g.clone();
         for (i, x_i) in assignment.into_iter().enumerate() {
             let idx = i + 1;
-            g_1_sub = partial_eval_i(g_1_sub, &x_i, idx);
+            g_1_sub = partial_eval_i(&g_1_sub, &x_i, idx);
         }
         g_1 = add_poly(&g_1, &g_1_sub);
     }
-    let g_1_coeffs = get_univariate_coeff(g_1, 1);
+    let g_1_coeffs = get_univariate_coeff(&g_1, 1);
     proof.push(g_1_coeffs.clone());
 
     let mimc_g1_coeffs = g_1_coeffs.iter().map(|s| convert_s_to_fr(s)).collect();
@@ -49,18 +49,18 @@ pub fn prove_sumcheck<S: PrimeField<Repr = [u8; 32]>>(
         let assignments: Vec<Vec<S>> = generate_binary(v - j - 1);
 
         for (i, r_i) in r.iter().enumerate() {
-            g_j = partial_eval_i(g_j, r_i, i + 1);
+            g_j = partial_eval_i(&g_j, r_i, i + 1);
         }
         let mut res_g_j = get_empty(v);
         for assignment in assignments {
             let mut g_j_sub = g_j.clone();
             for (i, x_i) in assignment.into_iter().enumerate() {
                 let idx = j + i + 2;
-                g_j_sub = partial_eval_i(g_j_sub, &x_i, idx);
+                g_j_sub = partial_eval_i(&g_j_sub, &x_i, idx);
             }
             res_g_j = add_poly(&res_g_j, &g_j_sub);
         }
-        let g_j_coeffs = get_univariate_coeff(res_g_j, j + 1);
+        let g_j_coeffs = get_univariate_coeff(&res_g_j, j + 1);
         proof.push(g_j_coeffs.clone());
 
         let mimc_gj_coeffs = g_j_coeffs.iter().map(|s| convert_s_to_fr(s)).collect();
@@ -69,7 +69,7 @@ pub fn prove_sumcheck<S: PrimeField<Repr = [u8; 32]>>(
     }
 
     let g_v = partial_eval(g.clone(), &r);
-    let g_v_coeffs = get_univariate_coeff(g_v, v);
+    let g_v_coeffs = get_univariate_coeff(&g_v, v);
     proof.push(g_v_coeffs.clone());
 
     let mimc_gv_coeffs = g_v_coeffs.iter().map(|s| convert_s_to_fr(s)).collect();

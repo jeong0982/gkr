@@ -36,6 +36,7 @@ pub struct Layer<S: PrimeField> {
 
 pub struct GKRCircuit<S: PrimeField> {
     pub layer: Vec<Layer<S>>,
+    pub d: Vec<Vec<S>>,
 }
 
 impl<S: PrimeField> GKRCircuit<S> {
@@ -57,5 +58,33 @@ impl<S: PrimeField> GKRCircuit<S> {
 
     pub fn k(&self, i: usize) -> usize {
         self.layer[i].k
+    }
+
+    pub fn d(&self) -> Vec<Vec<S>> {
+        self.d.clone()
+    }
+
+    pub fn get_k_list(&self) -> Vec<usize> {
+        let mut ks = vec![];
+        for i in 0..self.depth() {
+            ks.push(self.k(i));
+        }
+        ks
+    }
+
+    pub fn get_add_list(&self) -> Vec<Vec<Vec<S>>> {
+        let mut adds = vec![];
+        for i in 0..self.depth() {
+            adds.push(self.add(i));
+        }
+        adds
+    }
+
+    pub fn get_mult_list(&self) -> Vec<Vec<Vec<S>>> {
+        let mut mults = vec![];
+        for i in 0..self.depth() {
+            mults.push(self.mult(i));
+        }
+        mults
     }
 }

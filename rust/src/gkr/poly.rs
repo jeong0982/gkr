@@ -19,23 +19,29 @@ pub fn generate_binary<S: PrimeField>(l: usize) -> Vec<Vec<S>> {
             acc
         } else {
             let mut new_acc = vec![];
-            for b in acc {
-                let mut b_zero = b.clone();
-                let mut b_one = b.clone();
-                b_zero.push(S::ZERO);
-                b_one.push(S::ONE);
+            if acc.len() == 0 {
+                let b_zero = vec![S::ZERO];
+                let b_one = vec![S::ONE];
                 new_acc.push(b_zero);
                 new_acc.push(b_one);
+            } else {
+                for b in acc {
+                    let mut b_zero = b.clone();
+                    let mut b_one = b.clone();
+                    b_zero.push(S::ZERO);
+                    b_one.push(S::ONE);
+                    new_acc.push(b_zero);
+                    new_acc.push(b_one);
+                }
             }
             genbin(n, current + 1, new_acc)
         }
     }
-    let empty = vec![];
-    genbin(l, 0, Vec::from(empty))
+    genbin(l, 0, vec![])
 }
 
 pub fn partial_eval_i<S: PrimeField<Repr = [u8; 32]>>(
-    f: Vec<Vec<S>>,
+    f: &Vec<Vec<S>>,
     x: &S,
     i: usize,
 ) -> Vec<Vec<S>> {
@@ -43,7 +49,7 @@ pub fn partial_eval_i<S: PrimeField<Repr = [u8; 32]>>(
     for t in f.iter() {
         let mut new_t = t.clone();
         let exp = fe_to_u256(t[i]).as_usize();
-        let mut x_pow = x.clone();
+        let mut x_pow = *x;
         for _ in 0..exp {
             x_pow *= x;
         }
@@ -77,11 +83,11 @@ pub fn partial_eval<S: PrimeField<Repr = [u8; 32]>>(f: Vec<Vec<S>>, r: &Vec<S>) 
     res_f
 }
 
-pub fn eval_univariate<S: PrimeField<Repr = [u8; 32]>>(f: Vec<S>, x: &S) -> S {
+pub fn eval_univariate<S: PrimeField<Repr = [u8; 32]>>(f: &Vec<S>, x: &S) -> S {
     let mut res = f[0];
-    for i in 1..f.len() {
+    for i in f.iter().skip(1) {
         res *= x;
-        res += f[i];
+        res += *i;
     }
     res
 }
@@ -155,7 +161,7 @@ pub fn mult_poly<S: PrimeField>(f1: &Vec<Vec<S>>, f2: &Vec<Vec<S>>) -> Vec<Vec<S
     res
 }
 
-pub fn get_univariate_coeff<S: PrimeField<Repr = [u8; 32]>>(f: Vec<Vec<S>>, i: usize) -> Vec<S> {
+pub fn get_univariate_coeff<S: PrimeField<Repr = [u8; 32]>>(f: &Vec<Vec<S>>, i: usize) -> Vec<S> {
     let mut coeffs = vec![];
     for t in f {
         let deg_u256 = fe_to_u256(t[i]);
@@ -167,4 +173,82 @@ pub fn get_univariate_coeff<S: PrimeField<Repr = [u8; 32]>>(f: Vec<Vec<S>>, i: u
         coeffs[deg] += t[0];
     }
     coeffs
+}
+
+fn mult_univariate<S: PrimeField<Repr = [u8; 32]>>(p: Vec<S>, q: Vec<S>) -> Vec<S> {
+    let h_deg_p = p.len() - 1;
+    let h_deg_q = q.len() - 1;
+    let h_deg = h_deg_p + h_deg_q;
+    let mut res = vec![S::ZERO; h_deg + 1];
+    for (i, p_i) in p.iter().enumerate() {
+        for (j, q_i) in q.iter().enumerate() {
+            let deg = i + j;
+            let coeff = *p_i * (*q_i);
+            res[deg] += coeff;
+        }
+    }
+    res
+}
+
+fn add_univariate<S: PrimeField<Repr = [u8; 32]>>(p: Vec<S>, q: Vec<S>) -> Vec<S> {
+    let h_deg = std::cmp::max(p.len(), q.len());
+    let mut res = vec![S::ZERO; h_deg];
+    for i in 0..h_deg {
+        if i > p.len() - 1 {
+            res[i] = q[i];
+        } else if i > q.len() - 1 {
+            res[i] = p[i];
+        } else {
+            res[i] = p[i] + q[i];
+        }
+    }
+    res
+}
+
+pub fn reduce_multiple_polynomial<S: PrimeField<Repr = [u8; 32]>>(
+    b: &Vec<S>,
+    c: &Vec<S>,
+    w: Vec<Vec<S>>,
+) -> Vec<S> {
+    assert_eq!(b.len(), c.len());
+    let mut res = vec![];
+    let mut t = vec![];
+    let iterator = b.iter().zip(c.iter());
+    for (b_i, c_i) in iterator {
+        let gradient = *c_i - *b_i;
+        let new_const = *b_i;
+        t.push((new_const, gradient));
+    }
+    for terms in w {
+        let mut new_poly = vec![S::ONE];
+        for (i, d) in terms.iter().enumerate() {
+            if i == 0 {
+                new_poly[0] = *d;
+                continue;
+            }
+            let idx = i - 1;
+            let deg = fe_to_u256(*d).as_usize();
+            for _ in 0..deg {
+                let term = vec![t[idx].0, t[idx].1];
+                new_poly = mult_univariate(new_poly, term);
+            }
+        }
+        res = add_univariate(res, new_poly);
+    }
+    res
+}
+
+pub fn l_function<S: PrimeField<Repr = [u8; 32]>>(b: &Vec<S>, c: &Vec<S>, r: &S) -> Vec<S> {
+    let mut res = vec![];
+    let mut t = vec![];
+    let iterator = b.iter().zip(c.iter());
+    for (b_i, c_i) in iterator {
+        let gradient = *c_i - *b_i;
+        let new_const = *b_i;
+        t.push((new_const, gradient));
+    }
+    for t_i in t {
+        res.push(t_i.0 + t_i.1 * (*r));
+    }
+    res
 }

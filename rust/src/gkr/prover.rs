@@ -36,7 +36,7 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]>>(circuit: GKRCircuit<S>) -> Result<P
         let f = add_poly(&first, &second);
 
         let (sumcheck_proof, r) = prove_sumcheck(&f, 2 * circuit.k(i + 1));
-        sumcheck_proofs.push(sumcheck_proof);
+        sumcheck_proofs.push(sumcheck_proof.clone());
         sumcheck_r.push(r.clone());
 
         let mut b_star = vec![];
@@ -45,7 +45,7 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]>>(circuit: GKRCircuit<S>) -> Result<P
         c_star.extend_from_slice(&r[circuit.k(i + 1)..]);
 
         let next_w = circuit.w(i + 1);
-        let q_i = reduce_multiple_polynomial(b_star, c_star, next_w);
+        let q_i = reduce_multiple_polynomial(&b_star, &c_star, next_w);
 
         q.push(q_i);
 
@@ -53,11 +53,11 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]>>(circuit: GKRCircuit<S>) -> Result<P
         let mut f_modified_uni: Vec<S> = vec![];
         for (j, x) in r.iter().enumerate() {
             if j == r.len() - 1 {
-                f_res.push(eval_univariate(f_modified_uni, &x))
+                f_res.push(eval_univariate(&f_modified_uni, x))
             } else {
-                f_modified = partial_eval_i(f_modified, x, j);
+                f_modified = partial_eval_i(&f_modified, x, j);
                 if j == r.len() - 2 {
-                    f_modified_uni = get_univariate_coeff(f_modified, r.len() - 1);
+                    f_modified_uni = get_univariate_coeff(&f_modified, r.len() - 1);
                 }
             }
         }
@@ -68,23 +68,23 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]>>(circuit: GKRCircuit<S>) -> Result<P
             .collect();
         let r_star: S = convert_fr_to_s(mimc.multi_hash(mimc_r_star, &Fr::from(0)));
 
-        let next_r = ell(b_star, c_star, r_star);
+        let next_r = l_function(&b_star, &c_star, &r_star);
         z.push(next_r);
         r_stars.push(r_star);
     }
 
     Ok(Proof {
-        sumcheck_proofs: sumcheck_proofs,
-        sumcheck_r: sumcheck_r,
+        sumcheck_proofs,
+        sumcheck_r,
         f: f_res,
-        d: (),
-        q: q,
-        z: z,
+        d: circuit.d(),
+        q,
+        z,
         r: r_stars,
         depth: circuit.depth(),
-        input_func: (),
-        add: (),
-        mult: (),
-        k: (),
+        input_func: circuit.w(circuit.depth() - 1),
+        add: circuit.get_add_list(),
+        mult: circuit.get_mult_list(),
+        k: circuit.get_k_list(),
     })
 }
