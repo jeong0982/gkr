@@ -23,7 +23,9 @@ To make aggregated proof for previous proof and current round's proof, we need
 - input (for $C_i$)
 - proof $\pi_{i - 1}$
 
-Make integrated circuit $C'_{i}$. Use those inputs, make proof $\pi_{i}$.
+Make integrated circuit $C'_i$.
+
+Use those inputs, make proof $\pi_i$.
 To be specific, input and proof $\pi_{i - 1}$
 #### Last round
 Also there are two circuit $C_n$ and $C_{v_{n - 1}}$. To send aggregated proof to on-chain verifier, we can use groth16 prover in `snarkjs`.  
