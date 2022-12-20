@@ -2,7 +2,7 @@ use ff::PrimeField;
 use r1cs_file::{Constraint, FieldElement, R1csFile};
 
 use crate::gkr::GKRCircuit;
-use std::collections::{VecDeque, HashMap};
+use std::collections::VecDeque;
 use halo2curves::bn256::Fr;
 
 enum Expression<T> {
@@ -143,18 +143,25 @@ fn make_node_from_constraint(constraint: Constraint<32>) -> IntermediateNode<Fie
 // fn combine_gkr_circuit(c1: GKRCircuit<S>, c2: GKRCircuit<S>) -> GKRCircuit<S> {}
 
 fn convert_intermediate_node_gkr(nodes: Vec<IntermediateNode<FieldElement<32>>>) -> GKRCircuit<Fr> {
-    let mut layer_map = HashMap::new();
+    let mut layers = Vec::new();
     for node in nodes {
         let mut queue = VecDeque::new();
 
         queue.push_back((node, 0));
-        let mut layer = layer_map.get_mut(0);
+
         while !queue.is_empty() {
             let nodetuple = queue.pop_front().unwrap();
             let depth = nodetuple.1;
             let node = nodetuple.0;
 
-            if 
+            if layers.len() < depth + 1 {
+                let mut layer = Vec::new();
+                layer.push(node);
+                layers.push(layer);
+            } else {
+                let mut layer = layers[depth];
+                layer.push(node);
+            }
             if let Some(left) = &node.left {
                 queue.push_back((left, depth + 1));
             }
