@@ -40,6 +40,10 @@ pub fn generate_binary<S: PrimeField>(l: usize) -> Vec<Vec<S>> {
     genbin(l, 0, vec![])
 }
 
+fn chi<S: PrimeField>(w: Vec<S>) -> S {
+    
+}
+
 pub fn partial_eval_i<S: PrimeField<Repr = [u8; 32]>>(
     f: &Vec<Vec<S>>,
     x: &S,

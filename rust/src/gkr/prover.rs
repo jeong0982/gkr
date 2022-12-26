@@ -1,9 +1,12 @@
-use super::{poly::*, sumcheck::*, GKRCircuit, Proof};
+use super::{poly::*, sumcheck::*, GKRCircuit, Input, Proof};
 use ff::PrimeField;
 use mimc_rs::{Fr, Mimc7};
 use std::vec;
 
-pub fn prove<S: PrimeField<Repr = [u8; 32]>>(circuit: GKRCircuit<S>) -> Result<Proof<S>, ()> {
+pub fn prove<S: PrimeField<Repr = [u8; 32]>>(
+    circuit: GKRCircuit<S>,
+    input: Input<S>,
+) -> Result<Proof<S>, ()> {
     let mimc = Mimc7::new(91);
 
     let mut sumcheck_proofs = vec![];
@@ -24,8 +27,8 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]>>(circuit: GKRCircuit<S>) -> Result<P
         let mult = circuit.mult(i);
         let mult_res = partial_eval(mult, &z[i]);
 
-        let w_i_ext_b = modify_poly_from_k(circuit.w(i), circuit.k(i));
-        let w_i_ext_c = modify_poly_from_k(circuit.w(i), circuit.k(i) + circuit.k(i + 1));
+        let w_i_ext_b = modify_poly_from_k(input.w(i), circuit.k(i));
+        let w_i_ext_c = modify_poly_from_k(input.w(i), circuit.k(i) + circuit.k(i + 1));
 
         let w_i_ext_add = add_poly(&w_i_ext_b, &w_i_ext_c);
         let first = mult_poly(&add_res, &w_i_ext_add);

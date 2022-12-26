@@ -21,17 +21,33 @@ pub struct Proof<S: PrimeField> {
     pub k: Vec<usize>,
 }
 
-pub struct GKRNode<S: PrimeField> {
-    pub binary_index: Vec<usize>,
-    pub value: S,
+pub struct Input<S: PrimeField> {
+    pub w: Vec<Vec<Vec<S>>>,
+    pub d: Vec<Vec<S>>,
+}
+
+impl<S: PrimeField> Input<S> {
+    pub fn w(&self, i: usize) -> Vec<Vec<S>> {
+        self.w[i].clone()
+    }
 }
 
 pub struct Layer<S: PrimeField> {
     pub k: usize,
-    pub nodes: Vec<GKRNode<S>>,
     pub add: Vec<Vec<S>>,
     pub mult: Vec<Vec<S>>,
-    pub w: Vec<Vec<S>>,
+}
+
+impl<S: PrimeField> Layer<S> {
+    pub fn new(k: usize, add_bool: Vec<bool>, mult_bool: Vec<bool>) -> Self {
+        let mut 
+        for (i, b) in add_bool.iter().enumerate() {
+            if b {
+                
+            }
+        }
+        Layer { k, add, mult }
+    }
 }
 
 pub struct GKRCircuit<S: PrimeField> {
@@ -50,10 +66,6 @@ impl<S: PrimeField> GKRCircuit<S> {
 
     pub fn mult(&self, i: usize) -> Vec<Vec<S>> {
         self.layer[i].mult.clone()
-    }
-
-    pub fn w(&self, i: usize) -> Vec<Vec<S>> {
-        self.layer[i].w.clone()
     }
 
     pub fn k(&self, i: usize) -> usize {

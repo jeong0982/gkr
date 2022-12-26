@@ -2,8 +2,8 @@ use ff::PrimeField;
 use r1cs_file::{Constraint, FieldElement, R1csFile};
 
 use crate::gkr::GKRCircuit;
-use std::collections::VecDeque;
 use halo2curves::bn256::Fr;
+use std::collections::VecDeque;
 
 enum Expression<T> {
     Value(T),
