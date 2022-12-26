@@ -22,7 +22,10 @@ pub struct Proof<S: PrimeField> {
 }
 
 pub struct Input<S: PrimeField> {
+    // w[i] is function that gets index and returns value of each gate.
+    // polynomial form
     pub w: Vec<Vec<Vec<S>>>,
+    // d is output of circuit
     pub d: Vec<Vec<S>>,
 }
 

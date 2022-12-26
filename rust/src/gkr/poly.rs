@@ -1,6 +1,6 @@
 use ethers_core::types::U256;
 use ff::PrimeField;
-use std::vec;
+use std::{vec, collections::HashMap};
 
 fn fe_to_u256<F>(f: F) -> U256
 where
@@ -11,6 +11,60 @@ where
 
 pub fn get_empty<S: PrimeField>(l: usize) -> Vec<Vec<S>> {
     vec![vec![S::ZERO; l + 1]; 1]
+}
+
+fn minus_one<S: PrimeField>() -> S {
+    S::ZERO - S::ONE
+}
+
+fn constant_one<S: PrimeField>(l: usize) -> Vec<S> {
+    let mut one: [S; l + 1] = [S::ZERO; l + 1];
+    one[0] = S::ONE;
+    one.to_vec()
+}
+
+fn chi_w<S: PrimeField>(w: Vec<usize>) -> Vec<Vec<S>>{
+    let mut prod = Vec::new();
+    let l = w.len();
+    for (i, w_i) in w.iter().enumerate() {
+        let idx = i + 1;
+        if *w_i == 0{
+            let mut subres = vec![];
+            let mut term = constant_one::<S>(l);
+            term[idx] = minus_one();
+            let one = constant_one::<S>(l);
+            subres.push(term);
+            subres.push(one);
+            prod.push(subres);
+        } else if *w_i == 1 {
+            let mut term = constant_one::<S>(l);
+            term[idx] = S::ONE;
+            let mut subres = vec![];
+            subres.push(term);
+            prod.push(subres);
+        }
+    }
+    let mut res = vec![];
+    res.push(constant_one::<S>(l));
+    for term in prod {
+        
+    }
+}
+
+fn generate_binary_string(l: usize) -> Vec<String> {
+    if l == 0 {
+        return vec![];
+    } else if l == 1 {
+        return vec!["0".to_string(), "1".to_string()];
+    } else {
+        let mut result = vec![];
+        let substrings = generate_binary_string(l - 1);
+        for s in substrings {
+            result.push(format!("{}0", s));
+            result.push(format!("{}1", s));
+        }
+        return result;
+    }
 }
 
 pub fn generate_binary<S: PrimeField>(l: usize) -> Vec<Vec<S>> {
@@ -38,10 +92,6 @@ pub fn generate_binary<S: PrimeField>(l: usize) -> Vec<Vec<S>> {
         }
     }
     genbin(l, 0, vec![])
-}
-
-fn chi<S: PrimeField>(w: Vec<S>) -> S {
-    
 }
 
 pub fn partial_eval_i<S: PrimeField<Repr = [u8; 32]>>(
@@ -240,6 +290,17 @@ pub fn reduce_multiple_polynomial<S: PrimeField<Repr = [u8; 32]>>(
         res = add_univariate(res, new_poly);
     }
     res
+}
+
+pub fn get_multi_ext<S: PrimeField<Repr = [u8;32]>>(b: HashMap<String, S>, v: usize) -> Vec<Vec<S>> {
+    let binary = generate_binary_string(v);
+    for idx in binary {
+        if !b.contains_key(&idx) || b.get(&idx).unwrap() == S::ZERO {
+            continue
+        } else {
+            todo!()
+        }
+    }
 }
 
 pub fn l_function<S: PrimeField<Repr = [u8; 32]>>(b: &Vec<S>, c: &Vec<S>, r: &S) -> Vec<S> {
