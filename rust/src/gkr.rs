@@ -43,12 +43,14 @@ pub struct Layer<S: PrimeField> {
 
 impl<S: PrimeField> Layer<S> {
     pub fn new(k: usize, add_bool: Vec<bool>, mult_bool: Vec<bool>) -> Self {
-        let mut 
-        for (i, b) in add_bool.iter().enumerate() {
-            if b {
-                
-            }
-        }
+        // let mut
+        // for (i, b) in add_bool.iter().enumerate() {
+        //     if b {
+
+        //     }
+        // }
+        let add = vec![];
+        let mult = vec![];
         Layer { k, add, mult }
     }
 }

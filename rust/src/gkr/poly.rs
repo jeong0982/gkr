@@ -1,6 +1,6 @@
 use ethers_core::types::U256;
 use ff::PrimeField;
-use std::{vec, collections::HashMap};
+use std::{collections::HashMap, vec};
 
 fn fe_to_u256<F>(f: F) -> U256
 where
@@ -18,17 +18,17 @@ fn minus_one<S: PrimeField>() -> S {
 }
 
 fn constant_one<S: PrimeField>(l: usize) -> Vec<S> {
-    let mut one: [S; l + 1] = [S::ZERO; l + 1];
-    one[0] = S::ONE;
-    one.to_vec()
+    let mut vec = vec![S::ZERO; l];
+    vec[0] = S::ONE;
+    vec
 }
 
-fn chi_w<S: PrimeField>(w: Vec<usize>) -> Vec<Vec<S>>{
+fn chi_w<S: PrimeField>(w: Vec<usize>) -> Vec<Vec<S>> {
     let mut prod = Vec::new();
     let l = w.len();
     for (i, w_i) in w.iter().enumerate() {
         let idx = i + 1;
-        if *w_i == 0{
+        if *w_i == 0 {
             let mut subres = vec![];
             let mut term = constant_one::<S>(l);
             term[idx] = minus_one();
@@ -46,9 +46,8 @@ fn chi_w<S: PrimeField>(w: Vec<usize>) -> Vec<Vec<S>>{
     }
     let mut res = vec![];
     res.push(constant_one::<S>(l));
-    for term in prod {
-        
-    }
+    for term in prod {}
+    res
 }
 
 fn generate_binary_string(l: usize) -> Vec<String> {
@@ -292,15 +291,20 @@ pub fn reduce_multiple_polynomial<S: PrimeField<Repr = [u8; 32]>>(
     res
 }
 
-pub fn get_multi_ext<S: PrimeField<Repr = [u8;32]>>(b: HashMap<String, S>, v: usize) -> Vec<Vec<S>> {
+pub fn get_multi_ext<S: PrimeField<Repr = [u8; 32]>>(
+    b: HashMap<String, S>,
+    v: usize,
+) -> Vec<Vec<S>> {
     let binary = generate_binary_string(v);
+    let mut res = vec![];
     for idx in binary {
-        if !b.contains_key(&idx) || b.get(&idx).unwrap() == S::ZERO {
-            continue
+        if !b.contains_key(&idx) || b.get(&idx).unwrap().clone() == S::ZERO {
+            continue;
         } else {
             todo!()
         }
     }
+    res
 }
 
 pub fn l_function<S: PrimeField<Repr = [u8; 32]>>(b: &Vec<S>, c: &Vec<S>, r: &S) -> Vec<S> {

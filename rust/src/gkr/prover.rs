@@ -6,7 +6,7 @@ use std::vec;
 // pub fn get_input<S: PrimeField<Repr = [u8; 32]>>(circuit: GKRCircuit<S>, value_vector: Vec<S>) -> Input<S> {
 //     let mut values = vec![];
 //     for i in 0..circuit.depth() - 1 {
-//         let mut 
+//         let mut
 //     }
 // }
 
@@ -54,7 +54,7 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]>>(
         b_star.extend_from_slice(&r[..circuit.k(i + 1)]);
         c_star.extend_from_slice(&r[circuit.k(i + 1)..]);
 
-        let next_w = circuit.w(i + 1);
+        let next_w = input.w(i + 1);
         let q_i = reduce_multiple_polynomial(&b_star, &c_star, next_w);
 
         q.push(q_i);
