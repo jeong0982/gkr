@@ -25,7 +25,9 @@ mod tests {
 
     #[test]
     fn test_dag() {
-        let dag = parse_circom(String::from("../gkr-verifier-circuits/circom/circom/verifier.circom"));
+        let dag = parse_circom(String::from(
+            "../gkr-verifier-circuits/circom/circom/verifier.circom",
+        ));
         println!("{}", dag.nodes[2].number_of_outputs());
     }
 }

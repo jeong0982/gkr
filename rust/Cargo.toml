@@ -9,7 +9,8 @@ edition = "2021"
 dag = { git = "https://github.com/jeong0982/circom" }
 parser = { git = "https://github.com/jeong0982/circom" }
 constraint_generation = { git = "https://github.com/jeong0982/circom" }
-r1cs-file = { git = "https://github.com/lvella/zeropool-utils.git" }
+r1cs-file = { git = "https://github.com/lvella/zeropool-utils" }
+wtns-file = { git = "https://github.com/lvella/zeropool-utils" }
 
 # field element
 halo2curves = { git = "https://github.com/privacy-scaling-explorations/halo2curves" }
@@ -18,3 +19,6 @@ ethers-core = "0.17.0"
 
 # MiMC
 mimc-rs = { git = "https://github.com/jeong0982/mimc-rs" }
+
+# cli
+clap = { version = "4.0", features = ["derive"] }
