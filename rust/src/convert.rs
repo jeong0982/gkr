@@ -1,29 +1,39 @@
-use ethers_core::k256::elliptic_curve::PrimeField;
-use ff::PrimeField;
 use r1cs_file::{Constraint, FieldElement, R1csFile};
 use wtns_file::*;
 
 use crate::gkr::GKRCircuit;
 use halo2curves::bn256::Fr;
-use std::collections::VecDeque;
+use halo2curves::group::ff::PrimeField;
+use std::collections::{HashMap, VecDeque};
 
-const MINUS_ONE: Fr = Fr::zero() - Fr::one();
-
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 enum Expression<T> {
     Value(T),
     Variable(u32),
 }
 
+#[derive(Clone, Copy)]
 enum NodeType<T> {
     Mult,
     Add,
     Value(Expression<T>),
 }
 
+#[derive(Clone)]
 struct IntermediateNode<T> {
     node_type: NodeType<T>,
     left: Option<Box<IntermediateNode<T>>>,
     right: Option<Box<IntermediateNode<T>>>,
+}
+
+impl<T: Copy> IntermediateNode<T> {
+    fn copy(&self) -> Self {
+        IntermediateNode {
+            node_type: self.node_type,
+            left: self.left.as_ref().map(|node| Box::new(node.copy())),
+            right: self.right.as_ref().map(|node| Box::new(node.copy())),
+        }
+    }
 }
 
 impl<T> IntermediateNode<T> {
@@ -49,20 +59,40 @@ impl<T> IntermediateNode<T> {
             _ => false,
         }
     }
+
+    fn depth(&self) -> usize {
+        let left_depth = self.left.as_ref().map(|node| node.depth()).unwrap_or(0);
+        let right_depth = self.right.as_ref().map(|node| node.depth()).unwrap_or(0);
+        std::cmp::max(left_depth, right_depth) + 1
+    }
+}
+
+fn zero_node() -> IntermediateNode<FieldElement<32>> {
+    let zero = FieldElement::from((Fr::zero()).to_repr());
+    IntermediateNode {
+        node_type: NodeType::Value(Expression::Value(zero)),
+        left: None,
+        right: None,
+    }
+}
+
+struct IntermediateLayer<T> {
+    node_types: Vec<NodeType<T>>,
+    operand_index: Vec<(usize, usize)>,
 }
 
 fn merge_nodes(
     nodes: Vec<IntermediateNode<FieldElement<32>>>,
 ) -> IntermediateNode<FieldElement<32>> {
     if nodes.len() == 1 {
-        return nodes[0];
+        return nodes[0].clone();
     }
 
-    let new = vec![];
+    let mut new = vec![];
     let width = nodes.len() / 2 - 1;
     for i in 0..width {
-        let left = nodes[2 * i];
-        let right = nodes[2 * i + 1];
+        let left = nodes[2 * i].clone();
+        let right = nodes[2 * i + 1].clone();
         let node = IntermediateNode::<FieldElement<32>> {
             node_type: NodeType::Add,
             left: Some(Box::new(left)),
@@ -75,7 +105,7 @@ fn merge_nodes(
         let new_node = IntermediateNode::<FieldElement<32>> {
             node_type: NodeType::Add,
             left: Some(Box::new(merged)),
-            right: Some(Box::new(nodes[nodes.len() - 1])),
+            right: Some(Box::new(nodes[nodes.len() - 1].clone())),
         };
         new_node
     } else {
@@ -88,9 +118,9 @@ fn make_node_from_constraint(constraint: Constraint<32>) -> IntermediateNode<Fie
     let b = constraint.1;
     let c = constraint.2;
 
-    let node_a = vec![];
-    let node_b = vec![];
-    let node_c = vec![];
+    let mut node_a = vec![];
+    let mut node_b = vec![];
+    let mut node_c = vec![];
 
     for (coeff, x_i) in a {
         let left = IntermediateNode::new_from_value(coeff);
@@ -122,59 +152,147 @@ fn make_node_from_constraint(constraint: Constraint<32>) -> IntermediateNode<Fie
         };
         node_c.push(node);
     }
-    let root_a = merge_nodes(node_a);
-    let root_b = merge_nodes(node_b);
-    let root_c = merge_nodes(node_c);
+    if node_a.len() != 0 && node_b.len() != 0 {
+        let root_a = merge_nodes(node_a);
+        let root_b = merge_nodes(node_b);
+        let root_c = merge_nodes(node_c);
 
-    let a_times_b = IntermediateNode {
-        node_type: NodeType::Mult,
-        left: Some(Box::new(root_a)),
-        right: Some(Box::new(root_b)),
-    };
+        let a_times_b = IntermediateNode {
+            node_type: NodeType::Mult,
+            left: Some(Box::new(root_a)),
+            right: Some(Box::new(root_b)),
+        };
 
-    let minus_one = MINUS_ONE.to_repr() as FieldElement<32>;
-    let minus_c = IntermediateNode {
-        node_type: NodeType::Mult,
-        left: Some(Box::new(root_c)),
-        right: Some(Box::new(minus_one)),
-    };
-    IntermediateNode {
-        node_type: NodeType::Add,
-        left: Some(Box::new(a_times_b)),
-        right: Some(Box::new(minus_c)),
+        let minus_one_val =
+            Expression::Value(FieldElement::from((Fr::zero() - Fr::one()).to_repr()));
+        let minus_one = IntermediateNode::<FieldElement<32>> {
+            node_type: NodeType::Value(minus_one_val),
+            left: None,
+            right: None,
+        };
+        let minus_c = IntermediateNode {
+            node_type: NodeType::Mult,
+            left: Some(Box::new(root_c)),
+            right: Some(Box::new(minus_one)),
+        };
+        IntermediateNode {
+            node_type: NodeType::Add,
+            left: Some(Box::new(a_times_b)),
+            right: Some(Box::new(minus_c)),
+        }
+    } else {
+        // [] * [] - C = 0
+        merge_nodes(node_c)
     }
 }
 
-fn convert_intermediate_node_gkr(nodes: Vec<IntermediateNode<FieldElement<32>>>) -> GKRCircuit<Fr> {
-    let mut layers = Vec::new();
-    for node in nodes {
-        let mut queue = VecDeque::new();
+fn get_k(n: usize) -> usize {
+    let mut k = 0;
+    let mut m = n;
+    while m > 0 {
+        m >>= 1;
+        k += 1;
+    }
+    k
+}
 
-        queue.push_back((node, 0));
+fn compile(
+    nodes: Vec<IntermediateNode<FieldElement<32>>>,
+) -> Vec<IntermediateLayer<FieldElement<32>>> {
+    let mut layers = vec![];
 
-        while !queue.is_empty() {
-            let nodetuple = queue.pop_front().unwrap();
-            let depth = nodetuple.1;
-            let node = nodetuple.0;
+    let zero = FieldElement::from((Fr::zero()).to_repr());
 
-            if layers.len() < depth + 1 {
-                let mut layer = Vec::new();
-                layer.push(node);
-                layers.push(layer);
-            } else {
-                let mut layer = layers[depth];
-                layer.push(node);
-            }
-            if let Some(left) = &node.left {
-                queue.push_back((left, depth + 1));
-            }
-            if let Some(right) = &node.right {
-                queue.push_back((right, depth + 1));
+    let height = nodes.iter().map(|node| node.depth()).max().unwrap_or(0);
+    if height == 0 {
+        return layers;
+    }
+
+    let mut used: HashMap<Expression<FieldElement<32>>, usize> = HashMap::new();
+    let mut current_nodes = nodes.clone();
+    let mut next_nodes = vec![];
+    let mut zero_index = None;
+    for d in 0..height - 1 {
+        let mut layer_operand_idx = vec![];
+        let mut node_types = vec![];
+
+        let k = get_k(current_nodes.len());
+        let full_num = 2 << k;
+        let diff = full_num - k;
+        let added_zero_idx = current_nodes.len();
+        for _ in 0..diff {
+            current_nodes.push(zero_node());
+        }
+        for node in current_nodes.iter() {
+            match node.node_type {
+                NodeType::Mult | NodeType::Add => {
+                    node_types.push(node.node_type);
+                    let operand_index = (next_nodes.len(), next_nodes.len() + 1);
+                    layer_operand_idx.push(operand_index);
+                    node.left
+                        .as_ref()
+                        .map(|node| next_nodes.push(*(node.clone())));
+                    node.right
+                        .as_ref()
+                        .map(|node| next_nodes.push(*(node.clone())));
+                }
+                NodeType::Value(e) => {
+                    if used.contains_key(&e) {
+                        node_types.push(NodeType::Add);
+                        let operand_index = (used.get(&e).unwrap().clone(), zero_index.unwrap());
+                        layer_operand_idx.push(operand_index);
+                    } else {
+                        if zero_index == None {
+                            zero_index = Some(next_nodes.len());
+                            next_nodes.push(zero_node());
+                        }
+                        match e {
+                            Expression::Value(v) => {
+                                node_types.push(NodeType::Add);
+                                if v == zero {
+                                    used.insert(e, zero_index.unwrap());
+                                    let operand_index = (zero_index.unwrap(), zero_index.unwrap());
+                                    layer_operand_idx.push(operand_index);
+                                } else {
+                                    used.insert(e, next_nodes.len());
+                                    let operand_index = (next_nodes.len(), zero_index.unwrap());
+                                    next_nodes.push(IntermediateNode::new_from_value(v));
+                                    layer_operand_idx.push(operand_index);
+                                }
+                            }
+                            Expression::Variable(var) => {
+                                node_types.push(NodeType::Add);
+                                used.insert(e, next_nodes.len());
+                                let operand_index = (next_nodes.len(), zero_index.unwrap());
+                                next_nodes.push(IntermediateNode::new_from_variable(var));
+                                layer_operand_idx.push(operand_index);
+                            }
+                        }
+                    }
+                }
             }
         }
+        layers.push(IntermediateLayer {
+            node_types,
+            operand_index: layer_operand_idx,
+        });
+        zero_index = None;
+        current_nodes = next_nodes;
+        next_nodes = vec![];
+        used = HashMap::new();
     }
+    layers
 }
 
-pub fn convert_r1cs_gkr(r1cs: R1csFile<32>) -> GKRCircuit<Fr> {
-    todo!()
+fn convert_constraints_to_nodes(r1cs: R1csFile<32>) -> Vec<IntermediateNode<FieldElement<32>>> {
+    let constraints = r1cs.constraints;
+    let mut nodes = vec![];
+    for constraint in constraints.0 {
+        nodes.push(make_node_from_constraint(constraint));
+    }
+    nodes
+}
+
+pub fn convert_r1cs_gkr(r1cs: R1csFile<32>) -> () {
+    let layers = compile(convert_constraints_to_nodes(r1cs));
 }
