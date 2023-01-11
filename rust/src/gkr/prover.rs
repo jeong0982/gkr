@@ -13,7 +13,7 @@ use std::vec;
 pub fn prove<S: PrimeField<Repr = [u8; 32]>>(
     circuit: GKRCircuit<S>,
     input: Input<S>,
-) -> Result<Proof<S>, ()> {
+) -> Proof<S> {
     let mimc = Mimc7::new(91);
 
     let mut sumcheck_proofs = vec![];
@@ -23,7 +23,7 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]>>(
     let mut r_stars = vec![];
     let mut z_zero = vec![];
     for _ in 0..circuit.layer[0].k {
-        z_zero.push(S::ZERO);
+        z_zero.push(S::zero());
     }
     let mut z = vec![];
     z.push(z_zero);
@@ -83,11 +83,11 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]>>(
         r_stars.push(r_star);
     }
 
-    Ok(Proof {
+    Proof {
         sumcheck_proofs,
         sumcheck_r,
         f: f_res,
-        d: circuit.d(),
+        d: input.d.clone(),
         q,
         z,
         r: r_stars,
@@ -96,5 +96,5 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]>>(
         add: circuit.get_add_list(),
         mult: circuit.get_mult_list(),
         k: circuit.get_k_list(),
-    })
+    }
 }

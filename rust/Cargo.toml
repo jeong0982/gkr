@@ -14,8 +14,8 @@ wtns-file = { git = "https://github.com/jeong0982/zeropool-utils" }
 
 # field element
 halo2curves = { git = "https://github.com/privacy-scaling-explorations/halo2curves" }
-ff = { git = "https://github.com/zkcrypto/ff" }
-ethers-core = "0.17.0"
+ff = "0.12.0"
+ethers-core = "0.17"
 
 # MiMC
 mimc-rs = { git = "https://github.com/jeong0982/mimc-rs" }

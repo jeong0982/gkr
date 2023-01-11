@@ -42,25 +42,20 @@ pub struct Layer<S: PrimeField> {
 }
 
 impl<S: PrimeField> Layer<S> {
-    pub fn new(k: usize, add_bool: Vec<bool>, mult_bool: Vec<bool>) -> Self {
-        // let mut
-        // for (i, b) in add_bool.iter().enumerate() {
-        //     if b {
-
-        //     }
-        // }
-        let add = vec![];
-        let mult = vec![];
+    pub fn new(k: usize, add: Vec<Vec<S>>, mult: Vec<Vec<S>>) -> Self {
         Layer { k, add, mult }
     }
 }
 
 pub struct GKRCircuit<S: PrimeField> {
     pub layer: Vec<Layer<S>>,
-    pub d: Vec<Vec<S>>,
 }
 
 impl<S: PrimeField> GKRCircuit<S> {
+    pub fn new(layer: Vec<Layer<S>>) -> Self {
+        GKRCircuit { layer }
+    }
+
     pub fn depth(&self) -> usize {
         self.layer.len()
     }
@@ -75,10 +70,6 @@ impl<S: PrimeField> GKRCircuit<S> {
 
     pub fn k(&self, i: usize) -> usize {
         self.layer[i].k
-    }
-
-    pub fn d(&self) -> Vec<Vec<S>> {
-        self.d.clone()
     }
 
     pub fn get_k_list(&self) -> Vec<usize> {

@@ -1,6 +1,6 @@
 use ethers_core::types::U256;
 use ff::PrimeField;
-use std::{collections::HashMap, vec};
+use std::vec;
 
 fn fe_to_u256<F>(f: F) -> U256
 where
@@ -10,25 +10,38 @@ where
 }
 
 pub fn get_empty<S: PrimeField>(l: usize) -> Vec<Vec<S>> {
-    vec![vec![S::ZERO; l + 1]; 1]
+    vec![vec![S::zero(); l + 1]; 1]
 }
 
 fn minus_one<S: PrimeField>() -> S {
-    S::ZERO - S::ONE
+    S::zero() - S::one()
 }
 
 fn constant_one<S: PrimeField>(l: usize) -> Vec<S> {
-    let mut vec = vec![S::ZERO; l];
-    vec[0] = S::ONE;
+    let mut vec = vec![S::zero(); l];
+    vec[0] = S::one();
     vec
 }
 
-fn chi_w<S: PrimeField>(w: Vec<usize>) -> Vec<Vec<S>> {
+fn mult_multi_poly<S: PrimeField>(l: &Vec<S>, r: &Vec<S>) -> Vec<S> {
+    let length = l.len();
+    let mut res = vec![];
+    for i in 0..length {
+        if i == 0 {
+            res.push(l[i] * r[i]);
+        } else {
+            res.push(l[i] + r[i])
+        };
+    }
+    res
+}
+
+pub fn chi_w<S: PrimeField>(w: String) -> Vec<Vec<S>> {
     let mut prod = Vec::new();
     let l = w.len();
-    for (i, w_i) in w.iter().enumerate() {
+    for (i, w_i) in w.chars().enumerate() {
         let idx = i + 1;
-        if *w_i == 0 {
+        if w_i == '0' {
             let mut subres = vec![];
             let mut term = constant_one::<S>(l);
             term[idx] = minus_one();
@@ -36,9 +49,9 @@ fn chi_w<S: PrimeField>(w: Vec<usize>) -> Vec<Vec<S>> {
             subres.push(term);
             subres.push(one);
             prod.push(subres);
-        } else if *w_i == 1 {
+        } else if w_i == '1' {
             let mut term = constant_one::<S>(l);
-            term[idx] = S::ONE;
+            term[idx] = S::one();
             let mut subres = vec![];
             subres.push(term);
             prod.push(subres);
@@ -46,11 +59,19 @@ fn chi_w<S: PrimeField>(w: Vec<usize>) -> Vec<Vec<S>> {
     }
     let mut res = vec![];
     res.push(constant_one::<S>(l));
-    for term in prod {}
+    for poly in prod {
+        let mut new_res = vec![];
+        for term in poly.iter() {
+            for res_term in res.iter() {
+                new_res.push(mult_multi_poly(term, res_term));
+            }
+        }
+        res = new_res;
+    }
     res
 }
 
-fn generate_binary_string(l: usize) -> Vec<String> {
+pub fn generate_binary_string(l: usize) -> Vec<String> {
     if l == 0 {
         return vec![];
     } else if l == 1 {
@@ -73,16 +94,16 @@ pub fn generate_binary<S: PrimeField>(l: usize) -> Vec<Vec<S>> {
         } else {
             let mut new_acc = vec![];
             if acc.len() == 0 {
-                let b_zero = vec![S::ZERO];
-                let b_one = vec![S::ONE];
+                let b_zero = vec![S::zero()];
+                let b_one = vec![S::one()];
                 new_acc.push(b_zero);
                 new_acc.push(b_one);
             } else {
                 for b in acc {
                     let mut b_zero = b.clone();
                     let mut b_one = b.clone();
-                    b_zero.push(S::ZERO);
-                    b_one.push(S::ONE);
+                    b_zero.push(S::zero());
+                    b_one.push(S::one());
                     new_acc.push(b_zero);
                     new_acc.push(b_one);
                 }
@@ -108,7 +129,7 @@ pub fn partial_eval_i<S: PrimeField<Repr = [u8; 32]>>(
         }
         let constant = t[0] * x_pow;
         new_t[0] = constant;
-        new_t[i] = S::ZERO;
+        new_t[i] = S::zero();
         res_f.push(new_t);
     }
     res_f
@@ -149,7 +170,7 @@ pub fn modify_poly_from_k<S: PrimeField>(f: Vec<Vec<S>>, k: usize) -> Vec<Vec<S>
     let mut res_f = vec![];
     for t in f.iter() {
         let mut new_t = vec![t[0]];
-        let mut zeros = vec![S::ZERO; k];
+        let mut zeros = vec![S::zero(); k];
         new_t.append(&mut zeros);
         new_t.extend_from_slice(&t[1..]);
 
@@ -163,7 +184,7 @@ fn extend_length<S: PrimeField>(f: &Vec<S>, l: usize) -> Vec<S> {
         f.clone()
     } else {
         let mut new_f = f.clone();
-        let mut zeros = vec![S::ZERO; l - f.len()];
+        let mut zeros = vec![S::zero(); l - f.len()];
         new_f.append(&mut zeros);
         new_f
     }
@@ -220,7 +241,7 @@ pub fn get_univariate_coeff<S: PrimeField<Repr = [u8; 32]>>(f: &Vec<Vec<S>>, i: 
         let deg_u256 = fe_to_u256(t[i]);
         let deg = deg_u256.as_usize();
         if coeffs.len() + 1 < deg {
-            let mut acc = vec![S::ZERO; deg - coeffs.len()];
+            let mut acc = vec![S::zero(); deg - coeffs.len()];
             coeffs.append(&mut acc);
         }
         coeffs[deg] += t[0];
@@ -232,7 +253,7 @@ fn mult_univariate<S: PrimeField<Repr = [u8; 32]>>(p: Vec<S>, q: Vec<S>) -> Vec<
     let h_deg_p = p.len() - 1;
     let h_deg_q = q.len() - 1;
     let h_deg = h_deg_p + h_deg_q;
-    let mut res = vec![S::ZERO; h_deg + 1];
+    let mut res = vec![S::zero(); h_deg + 1];
     for (i, p_i) in p.iter().enumerate() {
         for (j, q_i) in q.iter().enumerate() {
             let deg = i + j;
@@ -245,7 +266,7 @@ fn mult_univariate<S: PrimeField<Repr = [u8; 32]>>(p: Vec<S>, q: Vec<S>) -> Vec<
 
 fn add_univariate<S: PrimeField<Repr = [u8; 32]>>(p: Vec<S>, q: Vec<S>) -> Vec<S> {
     let h_deg = std::cmp::max(p.len(), q.len());
-    let mut res = vec![S::ZERO; h_deg];
+    let mut res = vec![S::zero(); h_deg];
     for i in 0..h_deg {
         if i > p.len() - 1 {
             res[i] = q[i];
@@ -273,7 +294,7 @@ pub fn reduce_multiple_polynomial<S: PrimeField<Repr = [u8; 32]>>(
         t.push((new_const, gradient));
     }
     for terms in w {
-        let mut new_poly = vec![S::ONE];
+        let mut new_poly = vec![S::one()];
         for (i, d) in terms.iter().enumerate() {
             if i == 0 {
                 new_poly[0] = *d;
@@ -292,19 +313,24 @@ pub fn reduce_multiple_polynomial<S: PrimeField<Repr = [u8; 32]>>(
 }
 
 pub fn get_multi_ext<S: PrimeField<Repr = [u8; 32]>>(
-    b: HashMap<String, S>,
+    value: &Vec<S>,
     v: usize,
 ) -> Vec<Vec<S>> {
     let binary = generate_binary_string(v);
-    let mut res = vec![];
-    for idx in binary {
-        if !b.contains_key(&idx) || b.get(&idx).unwrap().clone() == S::ZERO {
+    let mut polynomial: Vec<Vec<S>> = vec![];
+    for b in binary {
+        let idx = usize::from_str_radix(&b, 2).unwrap();
+        let val = value[idx];
+        if val == S::zero() {
             continue;
-        } else {
-            todo!()
         }
+        let mut res = chi_w::<S>(b);
+        for i in 0..res.len() {
+            res[i][0] *= val
+        }
+        polynomial.append(&mut res);
     }
-    res
+    polynomial
 }
 
 pub fn l_function<S: PrimeField<Repr = [u8; 32]>>(b: &Vec<S>, c: &Vec<S>, r: &S) -> Vec<S> {
