@@ -110,18 +110,18 @@ fn merge_nodes(
     }
 }
 
-fn make_node_from_constraint(constraint: Constraint<32>) -> IntermediateNode<FieldElement<32>> {
-    let a = constraint.0;
-    let b = constraint.1;
-    let c = constraint.2;
+fn make_node_from_constraint(constraint: &Constraint<32>) -> IntermediateNode<FieldElement<32>> {
+    let a = &constraint.0;
+    let b = &constraint.1;
+    let c = &constraint.2;
 
     let mut node_a = vec![];
     let mut node_b = vec![];
     let mut node_c = vec![];
 
     for (coeff, x_i) in a {
-        let left = IntermediateNode::new_from_value(coeff);
-        let right = IntermediateNode::new_from_variable(x_i);
+        let left = IntermediateNode::new_from_value(coeff.clone());
+        let right = IntermediateNode::new_from_variable(x_i.clone());
         let node = IntermediateNode::<FieldElement<32>> {
             node_type: NodeType::Mult,
             left: Some(Box::new(left)),
@@ -130,8 +130,8 @@ fn make_node_from_constraint(constraint: Constraint<32>) -> IntermediateNode<Fie
         node_a.push(node);
     }
     for (coeff, x_i) in b {
-        let left = IntermediateNode::new_from_value(coeff);
-        let right = IntermediateNode::new_from_variable(x_i);
+        let left = IntermediateNode::new_from_value(coeff.clone());
+        let right = IntermediateNode::new_from_variable(x_i.clone());
         let node = IntermediateNode::<FieldElement<32>> {
             node_type: NodeType::Mult,
             left: Some(Box::new(left)),
@@ -140,8 +140,8 @@ fn make_node_from_constraint(constraint: Constraint<32>) -> IntermediateNode<Fie
         node_b.push(node);
     }
     for (coeff, x_i) in c {
-        let left = IntermediateNode::new_from_value(coeff);
-        let right = IntermediateNode::new_from_variable(x_i);
+        let left = IntermediateNode::new_from_value(coeff.clone());
+        let right = IntermediateNode::new_from_variable(x_i.clone());
         let node = IntermediateNode::<FieldElement<32>> {
             node_type: NodeType::Mult,
             left: Some(Box::new(left)),
@@ -339,10 +339,10 @@ fn compile(
     (layers, inputs)
 }
 
-fn convert_constraints_to_nodes(r1cs: R1csFile<32>) -> Vec<IntermediateNode<FieldElement<32>>> {
-    let constraints = r1cs.constraints;
+fn convert_constraints_to_nodes(r1cs: &R1csFile<32>) -> Vec<IntermediateNode<FieldElement<32>>> {
+    let constraints = &r1cs.constraints;
     let mut nodes = vec![];
-    for constraint in constraints.0 {
+    for constraint in &constraints.0 {
         nodes.push(make_node_from_constraint(constraint));
     }
     nodes
@@ -366,17 +366,16 @@ impl<S: PrimeField> Output<S> {
     }
 }
 
-fn make_output(r1cs: R1csHeader<32>, witness: Vec<FieldElement<32>>) -> Output<Fr> {
+fn make_output(r1cs: R1csHeader<32>, witness: Vec<wtns_file::FieldElement<32>>, sym: Vec<String>) -> Output<Fr> {
     let n_public_out = r1cs.n_pub_out;
     let n_public_in = r1cs.n_pub_in;
-    let n_public = n_public_out + n_public_in;
+    let n_public = (n_public_out + n_public_in) as usize;
 
-    let public = Output::<Fr>::new();
+    let mut public = Output::<Fr>::new();
 
     for i in 0..n_public {
-        if i >= n_public_out {
-        } else {
-        }
+        public.wire_map.insert(i + 1, Fr::from_repr(witness[i + 1].0).unwrap());
+        public.name_map.insert(i, sym[i].clone());
     }
 
     public
@@ -385,12 +384,13 @@ fn make_output(r1cs: R1csHeader<32>, witness: Vec<FieldElement<32>>) -> Output<F
 pub fn convert_r1cs_wtns_gkr(
     r1cs: R1csFile<32>,
     wtns: WtnsFile<32>,
-) -> (GKRCircuit<Fr>, Input<Fr>) {
-    let circuit_info = compile(convert_constraints_to_nodes(r1cs));
+) -> (GKRCircuit<Fr>, Input<Fr>, Output<Fr>) {
+    let circuit_info = compile(convert_constraints_to_nodes(&r1cs));
     let layers = circuit_info.0;
     let input = circuit_info.1;
 
-    let input_gkr = calculate_input(layers.clone(), input, wtns.witness);
+    let input_gkr = calculate_input(layers.clone(), input, &wtns.witness);
+    let output_gkr = make_output(r1cs.header, wtns.witness.0, vec![]);
 
     let mut gkr_layers = vec![];
     for i in 0..(layers.len() - 1) {
@@ -433,15 +433,15 @@ pub fn convert_r1cs_wtns_gkr(
         }
         gkr_layers.push(Layer::new(k_i, add_i, mult_i));
     }
-    (GKRCircuit::new(gkr_layers), input_gkr)
+    (GKRCircuit::new(gkr_layers), input_gkr, output_gkr)
 }
 
 fn calculate_input(
     ir_circuit: Vec<IntermediateLayer<FieldElement<32>>>,
     input_layer: Vec<NodeType<FieldElement<32>>>,
-    wtns: Witness<32>,
+    wtns: &Witness<32>,
 ) -> Input<Fr> {
-    let witness = wtns.0;
+    let witness = &wtns.0;
     let mut w_values = vec![];
     let mut input = vec![];
 
