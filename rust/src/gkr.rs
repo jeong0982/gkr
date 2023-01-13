@@ -2,6 +2,8 @@ pub mod poly;
 pub mod prover;
 pub mod sumcheck;
 
+use std::collections::HashMap;
+
 use ff::PrimeField;
 
 #[derive(Clone, Debug)]
@@ -19,6 +21,11 @@ pub struct Proof<S: PrimeField> {
     pub add: Vec<Vec<Vec<S>>>,
     pub mult: Vec<Vec<Vec<S>>>,
     pub k: Vec<usize>,
+}
+
+pub struct Output<S: PrimeField>{
+    pub wire_map: HashMap<usize, S>,
+    pub name_map: HashMap<usize, String>,
 }
 
 pub struct Input<S: PrimeField> {
