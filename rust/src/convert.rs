@@ -1,4 +1,4 @@
-use r1cs_file::{Constraint, FieldElement, R1csFile};
+use r1cs_file::{Constraint, FieldElement, Header as R1csHeader, R1csFile};
 use wtns_file::*;
 
 use crate::gkr::{
@@ -348,13 +348,50 @@ fn convert_constraints_to_nodes(r1cs: R1csFile<32>) -> Vec<IntermediateNode<Fiel
     nodes
 }
 
-pub fn convert_r1cs_wtns_gkr(r1cs: R1csFile<32>, wtns: WtnsFile<32>) -> (GKRCircuit<Fr>, Input<Fr>) {
+pub struct Output<S: PrimeField> {
+    pub wire_map: HashMap<usize, S>,
+    pub name_map: HashMap<usize, String>,
+}
+
+impl<S: PrimeField> Output<S> {
+    fn new() -> Self {
+        Output {
+            wire_map: HashMap::new(),
+            name_map: HashMap::new(),
+        }
+    }
+
+    pub fn get_name(&self, w: usize) -> Option<String> {
+        self.name_map.get(&w).cloned()
+    }
+}
+
+fn make_output(r1cs: R1csHeader<32>, witness: Vec<FieldElement<32>>) -> Output<Fr> {
+    let n_public_out = r1cs.n_pub_out;
+    let n_public_in = r1cs.n_pub_in;
+    let n_public = n_public_out + n_public_in;
+
+    let public = Output::<Fr>::new();
+
+    for i in 0..n_public {
+        if i >= n_public_out {
+        } else {
+        }
+    }
+
+    public
+}
+
+pub fn convert_r1cs_wtns_gkr(
+    r1cs: R1csFile<32>,
+    wtns: WtnsFile<32>,
+) -> (GKRCircuit<Fr>, Input<Fr>) {
     let circuit_info = compile(convert_constraints_to_nodes(r1cs));
     let layers = circuit_info.0;
     let input = circuit_info.1;
 
     let input_gkr = calculate_input(layers.clone(), input, wtns.witness);
-    
+
     let mut gkr_layers = vec![];
     for i in 0..(layers.len() - 1) {
         let k_i = get_k(layers[i].node_types.len());
@@ -438,7 +475,7 @@ fn calculate_input(
                     let right = w_values[w_values.len() - 1][layer.operand_index[i].1];
                     values.push(left * right);
                 }
-                NodeType::Value(_) => panic!("Layer types should not be a value")
+                NodeType::Value(_) => panic!("Layer types should not be a value"),
             }
         }
         w_values.push(values);
