@@ -1,13 +1,10 @@
-use r1cs_file::{Constraint, FieldElement, Header as R1csHeader, R1csFile};
+use r1cs_file::{Constraint, FieldElement, R1csFile};
 use wtns_file::*;
 
-use crate::gkr::{
-    poly::{chi_w, generate_binary_string, get_empty, get_multi_ext},
-    GKRCircuit, Input, Layer,
-};
+use crate::gkr::{poly::*, GKRCircuit, Input, Layer};
 use halo2curves::bn256::Fr;
 use halo2curves::group::ff::PrimeField;
-use std::collections::HashMap;
+use std::{collections::HashMap, fs::File, io::Read};
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
 enum Expression<T> {
@@ -366,15 +363,15 @@ impl<S: PrimeField> Output<S> {
     }
 }
 
-fn make_output(r1cs: R1csHeader<32>, witness: Vec<wtns_file::FieldElement<32>>, sym: Vec<String>) -> Output<Fr> {
-    let n_public_out = r1cs.n_pub_out;
-    let n_public_in = r1cs.n_pub_in;
-    let n_public = (n_public_out + n_public_in) as usize;
+fn make_output(witness: Vec<wtns_file::FieldElement<32>>, sym: Vec<String>) -> Output<Fr> {
+    let n_public = sym.len();
 
     let mut public = Output::<Fr>::new();
 
     for i in 0..n_public {
-        public.wire_map.insert(i + 1, Fr::from_repr(witness[i + 1].0).unwrap());
+        public
+            .wire_map
+            .insert(i + 1, Fr::from_repr(witness[i + 1].0).unwrap());
         public.name_map.insert(i, sym[i].clone());
     }
 
@@ -384,13 +381,17 @@ fn make_output(r1cs: R1csHeader<32>, witness: Vec<wtns_file::FieldElement<32>>, 
 pub fn convert_r1cs_wtns_gkr(
     r1cs: R1csFile<32>,
     wtns: WtnsFile<32>,
+    sym: String,
 ) -> (GKRCircuit<Fr>, Input<Fr>, Output<Fr>) {
     let circuit_info = compile(convert_constraints_to_nodes(&r1cs));
     let layers = circuit_info.0;
     let input = circuit_info.1;
 
     let input_gkr = calculate_input(layers.clone(), input, &wtns.witness);
-    let output_gkr = make_output(r1cs.header, wtns.witness.0, vec![]);
+    let output_gkr = make_output(
+        wtns.witness.0,
+        parse_sym(sym, r1cs.header.n_pub_in + r1cs.header.n_pub_out),
+    );
 
     let mut gkr_layers = vec![];
     for i in 0..(layers.len() - 1) {
@@ -491,4 +492,26 @@ fn calculate_input(
         w.push(get_multi_ext(layer_value, layer_value.len()));
     }
     Input { w, d }
+}
+
+fn parse_sym(sym: String, num_public: u32) -> Vec<String> {
+    let mut res = vec![];
+    if num_public == 0 {
+        return res;
+    }
+
+    let mut f = File::open(sym).expect("sym file not found");
+    let mut sym_content = String::new();
+    f.read_to_string(&mut sym_content).expect("Reading error");
+
+    for line in sym_content.lines() {
+        let l: Vec<&str> = line.split(',').collect();
+        let name_main: Vec<&str> = l[3].split('.').collect();
+        let name = name_main[1].to_string();
+        res.push(name);
+        if res.len() == (num_public as usize) {
+            break;
+        }
+    }
+    res
 }
