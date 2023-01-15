@@ -312,10 +312,7 @@ pub fn reduce_multiple_polynomial<S: PrimeField<Repr = [u8; 32]>>(
     res
 }
 
-pub fn get_multi_ext<S: PrimeField<Repr = [u8; 32]>>(
-    value: &Vec<S>,
-    v: usize,
-) -> Vec<Vec<S>> {
+pub fn get_multi_ext<S: PrimeField<Repr = [u8; 32]>>(value: &Vec<S>, v: usize) -> Vec<Vec<S>> {
     let binary = generate_binary_string(v);
     let mut polynomial: Vec<Vec<S>> = vec![];
     for b in binary {

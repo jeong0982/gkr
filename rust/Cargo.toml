@@ -16,9 +16,13 @@ wtns-file = { git = "https://github.com/jeong0982/zeropool-utils" }
 halo2curves = { git = "https://github.com/privacy-scaling-explorations/halo2curves" }
 ff = "0.12.0"
 ethers-core = "0.17"
+num-bigint = "0.4.3"
+num-traits = "0.2.15"
 
 # MiMC
 mimc-rs = { git = "https://github.com/jeong0982/mimc-rs" }
 
 # cli
 clap = { version = "4.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

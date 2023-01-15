@@ -1,8 +1,8 @@
 use ff::PrimeField;
 use halo2curves::bn256::Fr;
-use serde::{Serialize, Deserialize};
 use num_bigint::BigInt;
 use num_traits::Num;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
@@ -27,7 +27,9 @@ pub fn stringify_fr(f: Fr) -> String {
 fn make_output_value_map(output: Output<Fr>) -> Data {
     let mut value_map = HashMap::new();
     for (k, i) in output.wire_map.iter() {
-        let name = output.get_name(k.clone()).expect("Wire map and name map should have a same key");
+        let name = output
+            .get_name(k.clone())
+            .expect("Wire map and name map should have a same key");
         let value = stringify_fr(i.clone());
         value_map.insert(name, value);
     }

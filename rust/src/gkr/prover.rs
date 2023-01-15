@@ -3,17 +3,7 @@ use ff::PrimeField;
 use mimc_rs::{Fr, Mimc7};
 use std::vec;
 
-// pub fn get_input<S: PrimeField<Repr = [u8; 32]>>(circuit: GKRCircuit<S>, value_vector: Vec<S>) -> Input<S> {
-//     let mut values = vec![];
-//     for i in 0..circuit.depth() - 1 {
-//         let mut
-//     }
-// }
-
-pub fn prove<S: PrimeField<Repr = [u8; 32]>>(
-    circuit: GKRCircuit<S>,
-    input: Input<S>,
-) -> Proof<S> {
+pub fn prove<S: PrimeField<Repr = [u8; 32]>>(circuit: GKRCircuit<S>, input: Input<S>) -> Proof<S> {
     let mimc = Mimc7::new(91);
 
     let mut sumcheck_proofs = vec![];
