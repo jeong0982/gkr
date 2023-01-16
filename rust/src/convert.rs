@@ -415,6 +415,7 @@ pub fn convert_r1cs_wtns_gkr(
                     NodeType::Add => {
                         if !add_m {
                             add_i = chi_w::<Fr>(b);
+                            add_m = true;
                         } else {
                             add_i.append(&mut chi_w::<Fr>(b));
                         }
@@ -422,6 +423,7 @@ pub fn convert_r1cs_wtns_gkr(
                     NodeType::Mult => {
                         if !mult_m {
                             mult_i = chi_w::<Fr>(b);
+                            mult_m = true;
                         } else {
                             mult_i.append(&mut chi_w::<Fr>(b));
                         }

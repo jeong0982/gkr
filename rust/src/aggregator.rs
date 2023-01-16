@@ -1,6 +1,18 @@
-use crate::{file_utils::stringify_fr, gkr::Proof};
+use std::{
+    env::current_dir,
+    fs::File,
+    io::{Read, Write},
+    path::PathBuf,
+};
+
+use crate::{
+    convert::{convert_r1cs_wtns_gkr, Output},
+    file_utils::{stringify_fr, write_aggregated_input, write_output},
+    gkr::{prover, Proof},
+};
 use halo2curves::bn256::Fr;
 use serde::{Deserialize, Serialize};
+use tera::{Context, Tera};
 
 /// Circom-GKR
 struct Meta(Vec<usize>);
@@ -21,6 +33,26 @@ pub struct CircomInputProof {
 }
 
 impl CircomInputProof {
+    pub fn empty() -> Self {
+        let zero = String::from("0");
+        let sp = vec![vec![vec![zero.clone()]]];
+        let q = vec![vec![zero.clone()]];
+        let sr = vec![vec![zero.clone()]];
+        let f = vec![zero.clone()];
+        CircomInputProof {
+            sumcheckProof: sp.clone(),
+            sumcheckr: sr,
+            q: q.clone(),
+            f: f.clone(),
+            D: q.clone(),
+            z: q.clone(),
+            r: f.clone(),
+            inputFunc: q.clone(),
+            add: sp.clone(),
+            mult: sp.clone(),
+        }
+    }
+
     fn new_from_proof(proof: Proof<Fr>) -> Self {
         let sp: Vec<Vec<Vec<String>>> = proof
             .sumcheck_proofs
@@ -28,13 +60,21 @@ impl CircomInputProof {
             .map(|p| p.iter().map(|f| stringify_fr_vector(f)).collect())
             .collect();
 
-        let sr: Vec<Vec<String>> = proof.sumcheck_r.iter().map(|p| stringify_fr_vector(p)).collect();
+        let sr: Vec<Vec<String>> = proof
+            .sumcheck_r
+            .iter()
+            .map(|p| stringify_fr_vector(p))
+            .collect();
         let q: Vec<Vec<String>> = proof.q.iter().map(|p| stringify_fr_vector(p)).collect();
         let f: Vec<String> = stringify_fr_vector(&proof.f);
         let d: Vec<Vec<String>> = proof.d.iter().map(|p| stringify_fr_vector(p)).collect();
         let z: Vec<Vec<String>> = proof.z.iter().map(|p| stringify_fr_vector(p)).collect();
         let r: Vec<String> = stringify_fr_vector(&proof.r);
-        let input_func: Vec<Vec<String>> = proof.input_func.iter().map(|p| stringify_fr_vector(p)).collect();
+        let input_func: Vec<Vec<String>> = proof
+            .input_func
+            .iter()
+            .map(|p| stringify_fr_vector(p))
+            .collect();
         let add: Vec<Vec<Vec<String>>> = proof
             .add
             .iter()
@@ -45,8 +85,19 @@ impl CircomInputProof {
             .iter()
             .map(|p| p.iter().map(|f| stringify_fr_vector(f)).collect())
             .collect();
-        
-        CircomInputProof { sumcheckProof: sp, sumcheckr: sr, q, f, D: d, z, r, inputFunc: input_func, add, mult }
+
+        CircomInputProof {
+            sumcheckProof: sp,
+            sumcheckr: sr,
+            q,
+            f,
+            D: d,
+            z,
+            r,
+            inputFunc: input_func,
+            add,
+            mult,
+        }
     }
 }
 
@@ -128,7 +179,7 @@ fn modify_proof_for_circom(proof: Proof<Fr>, meta_value: Meta) -> Proof<Fr> {
         }
         if p.len() < 2 * meta[1] {
             for _ in 0..(2 * meta[1] - p.len()) {
-                let mut new_terms = zeros(meta[4]);
+                let new_terms = zeros(meta[4]);
                 new_p.push(new_terms);
             }
         }
@@ -178,7 +229,7 @@ fn modify_proof_for_circom(proof: Proof<Fr>, meta_value: Meta) -> Proof<Fr> {
         }
         if p.len() < meta[8] {
             for _ in 0..(meta[8] - p.len()) {
-                let mut new_terms = zeros(3 * meta[1] + 1);
+                let new_terms = zeros(3 * meta[1] + 1);
                 new_p.push(new_terms);
             }
         }
@@ -198,7 +249,7 @@ fn modify_proof_for_circom(proof: Proof<Fr>, meta_value: Meta) -> Proof<Fr> {
         }
         if p.len() < meta[9] {
             for _ in 0..(meta[9] - p.len()) {
-                let mut new_terms = zeros(3 * meta[1] + 1);
+                let new_terms = zeros(3 * meta[1] + 1);
                 new_p.push(new_terms);
             }
         }
@@ -220,4 +271,161 @@ fn modify_proof_for_circom(proof: Proof<Fr>, meta_value: Meta) -> Proof<Fr> {
     }
 }
 
-pub fn prove_recursively_circom() -> () {}
+fn modify_circom_file(path: String, meta_value: Meta) -> String {
+    let mut added = Tera::default();
+    let source = "
+    signal input sumcheckProof[d - 1][2 * largest_k][meta[4]];
+    signal input sumcheckr[d - 1][2 * largest_k];
+    signal input q[d - 1][meta[5]];
+    signal input f[d - 1];
+    signal input D[meta[3]][meta[2] + 1];
+    signal input z[d][largest_k];
+    signal input r[d - 1];
+    signal input inputFunc[meta[6]][meta[7] + 1];
+    signal input add[d - 1][meta[8]][3 * largest_k + 1];
+    signal input mult[d - 1][meta[9]][3 * largest_k + 1];
+    signal output isValid;
+    component verifier = VerifyGKR({{ meta }});
+    var a = {{ meta_0 }} - 1;
+    for (var i = 0; i < a; i++) {
+        for (var j = 0; j < 2 * {{ meta_1 }}; j++) {
+            for (var k = 0; k < {{ meta_4 }}; k++) {
+                verifier.sumcheckProof[i][j][k] <== sumcheckProof[i][j][k];
+            }
+        }
+    }
+    for (var i = 0; i < a; i++) {
+        for (var j = 0; j < 2 * {{ meta_1 }}; j++) {
+            verifier.sumcheckr[i][j] <== sumcheckr[i][j];
+        }
+    }
+    for (var i = 0; i < a; i++) {
+        for (var j = 0; j < {{ meta_5 }}; j++) {
+            verifier.q[i][j] <== q[i][j];
+        }
+    }
+    for (var i = 0; i < {{ meta_3 }}; i++) {
+        for (var j = 0; j < {{ meta_2 }} + 1; j++) {
+            verifier.D[i][j] <== D[i][j];
+        }
+    }
+    for (var i = 0; i < a; i++) {
+        verifier.f[i] <== f[i];
+    }
+    for (var i = 0; i < a + 1; i++) {
+        for (var j = 0; j < {{ meta_1 }}; j++) {
+            verifier.z[i][j] <== z[i][j];
+        }
+    }
+    for (var i = 0; i < a; i++) {
+        verifier.r[i] <== r[i];
+    }
+    for (var i = 0; i < {{ meta_6 }}; i++) {
+        for (var j = 0; j < {{ meta_7 }} + 1; j++) {
+            verifier.inputFunc[i][j] <== inputFunc[i][j];
+        }
+    }
+    for (var i = 0; i < a; i++) {
+        for (var j = 0; j < {{ meta_8 }}; j++) {
+            for (var k = 0; k < 3 * {{ meta_1 }} + 1; k++) {
+                verifier.add[i][j][k] <== add[i][j][k];
+            }
+        }
+    }
+    for (var i = 0; i < a; i++) {
+        for (var j = 0; j < {{ meta_9 }}; j++) {
+            for (var k = 0; k < 3 * {{ meta_1 }} + 1; k++) {
+                verifier.mult[i][j][k] <== mult[i][j][k];
+            }
+        }
+    }
+    isValid <== verifier.isValid;
+    ";
+    added.add_raw_template("verifier", source).unwrap();
+    let mut ctxt = Context::new();
+    let meta = format!("{:?}", meta_value.0);
+
+    ctxt.insert("meta", &meta);
+    for (i, value) in meta_value.0.iter().enumerate() {
+        let value_string = value.to_string();
+        let name = format!("{}_{}", "meta", i.to_string().as_str());
+
+        ctxt.insert(name, &value_string);
+    }
+    let s = added.render("verifier", &ctxt).unwrap();
+
+    let mut new_circuit = String::new();
+    let mut f = File::open(path).expect("original circuit");
+    let mut f_content = String::new();
+    f.read_to_string(&mut f_content).unwrap();
+
+    for line in f_content.lines() {
+        if line.eq("}") {
+            new_circuit = format!("{}\n{}\n}}", new_circuit, s);
+        } else {
+            new_circuit = format!("{}{}\n", new_circuit, line);
+        }
+    }
+
+    let file_path = current_dir().unwrap().join("aggregated.circom");
+    std::fs::write(&file_path, new_circuit);
+    file_path.into_os_string().into_string().unwrap()
+}
+
+pub fn prove_recursively_circom(
+    circuit_path: String,
+    previous_proof: Proof<Fr>,
+    input_path: String,
+) -> Proof<Fr> {
+    let meta = get_meta(&previous_proof);
+    let modified_proof = modify_proof_for_circom(previous_proof, meta);
+    let p = CircomInputProof::new_from_proof(modified_proof);
+    let aggregated_input_path = write_aggregated_input(input_path, p);
+    let aggregated_circuit_path = modify_circom_file(circuit_path, meta);
+    // circom aggregated_circuit --r1cs --sym --c
+    let result = convert_r1cs_wtns_gkr(r1cs, wtns, sym);
+    let proof = prover::prove(result.0, result.1);
+    write_output(output_path, result.2);
+    proof
+}
+
+pub fn prove_groth(circuit_path: String, previous_proof: Proof<Fr>, input_path: String) {
+    let meta = get_meta(&previous_proof);
+    let modified_proof = modify_proof_for_circom(previous_proof, meta);
+    let p = CircomInputProof::new_from_proof(modified_proof);
+    let aggregated_input_path = write_aggregated_input(input_path, p);
+    let aggregated_circuit_path = modify_circom_file(circuit_path, meta);
+}
+
+pub fn prove_all(circuit_path: String, input_paths: Vec<String>) {
+    // circom circuit --r1cs --sym --c
+    // https://docs.circom.io/getting-started/computing-the-witness/#the-witness-file
+    let proof = None;
+    for (i, input) in input_paths.iter().enumerate() {
+        if i == 0 {
+            let result = convert_r1cs_wtns_gkr(r1cs, wtns, sym);
+            proof = Some(prover::prove(result.0, result.1));
+            write_output(output_path, result.2);
+        } else if i == input_paths.len() - 1 {
+            prove_groth(circuit_path, proof.unwrap(), input.clone());
+        } else {
+            proof = Some(prove_recursively_circom(
+                circuit_path,
+                proof.unwrap(),
+                input.clone(),
+            ));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{modify_circom_file, Meta};
+
+    #[test]
+    fn test_print() {
+        let meta = Meta(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+        modify_circom_file(String::from("."), meta);
+        panic!(".");
+    }
+}
