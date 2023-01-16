@@ -2,8 +2,6 @@ pub mod poly;
 pub mod prover;
 pub mod sumcheck;
 
-use std::collections::HashMap;
-
 use ff::PrimeField;
 
 #[derive(Clone, Debug)]

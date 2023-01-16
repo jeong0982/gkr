@@ -6,9 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-dag = { git = "https://github.com/jeong0982/circom" }
-parser = { git = "https://github.com/jeong0982/circom" }
-constraint_generation = { git = "https://github.com/jeong0982/circom" }
 r1cs-file = { git = "https://github.com/jeong0982/zeropool-utils" }
 wtns-file = { git = "https://github.com/jeong0982/zeropool-utils" }
 

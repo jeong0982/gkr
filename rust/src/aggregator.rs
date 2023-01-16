@@ -2,17 +2,20 @@ use std::{
     env::current_dir,
     fs::File,
     io::{Read, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
+    process::Command,
 };
 
 use crate::{
     convert::{convert_r1cs_wtns_gkr, Output},
-    file_utils::{stringify_fr, write_aggregated_input, write_output},
+    file_utils::{execute_circom, get_name, stringify_fr, write_aggregated_input, write_output},
     gkr::{prover, Proof},
 };
 use halo2curves::bn256::Fr;
+use r1cs_file::*;
 use serde::{Deserialize, Serialize};
 use tera::{Context, Tera};
+use wtns_file::*;
 
 /// Circom-GKR
 struct Meta(Vec<usize>);
@@ -162,8 +165,8 @@ fn get_meta(proof: &Proof<Fr>) -> Meta {
     Meta(meta)
 }
 
-fn modify_proof_for_circom(proof: Proof<Fr>, meta_value: Meta) -> Proof<Fr> {
-    let meta = meta_value.0;
+fn modify_proof_for_circom(proof: Proof<Fr>, meta_value: &Meta) -> Proof<Fr> {
+    let meta = meta_value.0.clone();
     let mut sumcheck_proofs = vec![];
     for p in proof.sumcheck_proofs.iter() {
         let mut new_p = vec![];
@@ -271,7 +274,7 @@ fn modify_proof_for_circom(proof: Proof<Fr>, meta_value: Meta) -> Proof<Fr> {
     }
 }
 
-fn modify_circom_file(path: String, meta_value: Meta) -> String {
+fn modify_circom_file(path: String, meta_value: &Meta) -> String {
     let mut added = Tera::default();
     let source = "
     signal input sumcheckProof[d - 1][2 * largest_k][meta[4]];
@@ -378,40 +381,90 @@ pub fn prove_recursively_circom(
     input_path: String,
 ) -> Proof<Fr> {
     let meta = get_meta(&previous_proof);
-    let modified_proof = modify_proof_for_circom(previous_proof, meta);
+    let modified_proof = modify_proof_for_circom(previous_proof, &meta);
     let p = CircomInputProof::new_from_proof(modified_proof);
+
+    let input_name = get_name(&input_path);
     let aggregated_input_path = write_aggregated_input(input_path, p);
-    let aggregated_circuit_path = modify_circom_file(circuit_path, meta);
-    // circom aggregated_circuit --r1cs --sym --c
+    let aggregated_circuit_path = modify_circom_file(circuit_path.clone(), &meta);
+
+    let circom_result = execute_circom(aggregated_circuit_path);
+    let name = circom_result.1;
+    let r1cs_name = format!("{}.r1cs", name.clone());
+    let sym_name = format!("{}.sym", name.clone());
+
+    let root_path = circom_result.2;
+    let sym = format!("{}{}", root_path.clone(), sym_name);
+    let r1cs_path = format!("{}{}", root_path.clone(), r1cs_name);
+    let r1cs = R1csFile::<32>::read(File::open(r1cs_path).unwrap()).unwrap();
+
+    let executable_path = circom_result.0;
+    let witcommand = Command::new(name)
+        .arg(aggregated_input_path.clone())
+        .arg("witness.wtns")
+        .status()
+        .expect("Executable failed");
+    let wtns_path = current_dir().unwrap().join("witness.wtns");
+    let wtns = WtnsFile::<32>::read(File::open(wtns_path).unwrap()).unwrap();
+
     let result = convert_r1cs_wtns_gkr(r1cs, wtns, sym);
     let proof = prover::prove(result.0, result.1);
+
+    let output_name = format!("{}_output.json", &input_name);
+    let output_path = format!("{}{}", root_path.clone(), output_name);
     write_output(output_path, result.2);
     proof
 }
 
 pub fn prove_groth(circuit_path: String, previous_proof: Proof<Fr>, input_path: String) {
     let meta = get_meta(&previous_proof);
-    let modified_proof = modify_proof_for_circom(previous_proof, meta);
+    let modified_proof = modify_proof_for_circom(previous_proof, &meta);
     let p = CircomInputProof::new_from_proof(modified_proof);
     let aggregated_input_path = write_aggregated_input(input_path, p);
-    let aggregated_circuit_path = modify_circom_file(circuit_path, meta);
+    let aggregated_circuit_path = modify_circom_file(circuit_path, &meta);
 }
 
 pub fn prove_all(circuit_path: String, input_paths: Vec<String>) {
     // circom circuit --r1cs --sym --c
     // https://docs.circom.io/getting-started/computing-the-witness/#the-witness-file
-    let proof = None;
+    let mut proof = None;
     for (i, input) in input_paths.iter().enumerate() {
         if i == 0 {
+            let circom_result = execute_circom(circuit_path.clone());
+            let executable_path = circom_result.0;
+            let name = circom_result.1;
+            let root_path = circom_result.2;
+
+            let input_name = get_name(input);
+
+            let r1cs_name = format!("{}.r1cs", name.clone());
+            let r1cs_path = format!("{}{}", root_path.clone(), r1cs_name);
+            let r1cs = R1csFile::<32>::read(File::open(r1cs_path).unwrap()).unwrap();
+            let sym_name = format!("{}.sym", name.clone());
+
+            let witcommand = Command::new(name)
+                .arg(input.clone())
+                .arg("witness.wtns")
+                .status()
+                .expect("Executable failed");
+            let wtns_path = current_dir().unwrap().join("witness.wtns");
+            let wtns = WtnsFile::<32>::read(File::open(wtns_path).unwrap()).unwrap();
+
+            let sym = format!("{}{}", root_path.clone(), sym_name);
+
             let result = convert_r1cs_wtns_gkr(r1cs, wtns, sym);
             proof = Some(prover::prove(result.0, result.1));
+
+            let output_name = format!("{}_output.json", &input_name);
+            let output_path = format!("{}{}", root_path.clone(), output_name);
+
             write_output(output_path, result.2);
         } else if i == input_paths.len() - 1 {
-            prove_groth(circuit_path, proof.unwrap(), input.clone());
+            prove_groth(circuit_path.clone(), proof.clone().unwrap(), input.clone());
         } else {
             proof = Some(prove_recursively_circom(
-                circuit_path,
-                proof.unwrap(),
+                circuit_path.clone(),
+                proof.clone().unwrap(),
                 input.clone(),
             ));
         }
@@ -425,7 +478,7 @@ mod tests {
     #[test]
     fn test_print() {
         let meta = Meta(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-        modify_circom_file(String::from("."), meta);
+        modify_circom_file(String::from("."), &meta);
         panic!(".");
     }
 }

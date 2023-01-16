@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::env::current_dir;
 use std::fs;
 use std::io::Write;
+use std::process::Command;
 
 use crate::aggregator::CircomInputProof;
 use crate::convert::Output;
@@ -64,15 +65,63 @@ pub fn write_aggregated_input(path: String, input: CircomInputProof) -> String {
     new_path.into_os_string().into_string().unwrap()
 }
 
+pub fn get_name(path: &String) -> String {
+    let binding = path.clone();
+    let path_str: Vec<&str> = binding.as_str().split('/').collect();
+    let name_tuple: Vec<&str> = path_str[path_str.len() - 1].split('.').collect();
+    String::from(name_tuple[0])
+}
+
+pub fn execute_circom(path: String) -> (String, String, String) {
+    let command = Command::new("circom")
+        .arg(path.clone())
+        .arg("--r1cs")
+        .arg("--sym")
+        .arg("--c")
+        .output()
+        .expect("circom command failed");
+    println!("");
+    let path_str: Vec<&str> = path.as_str().split('/').collect();
+    let mut path_cloned = path_str.clone();
+    path_cloned.pop();
+    let mut root_path = String::new();
+    for slice in path_cloned {
+        root_path = format!("{}/", slice);
+    }
+    let circom_name: Vec<&str> = path_str[path_str.len() - 1].split('.').collect();
+    let name = circom_name[0];
+
+    let witness_gen_name = format!("{}_cpp/", name);
+    let witness_gen_file = current_dir().unwrap().join(witness_gen_name);
+
+    let _ = Command::new("make")
+        .current_dir(witness_gen_file.clone())
+        .status()
+        .expect("witness calculator generation failed");
+    println!("");
+    let executable = witness_gen_file.join(name);
+    (
+        executable.into_os_string().into_string().unwrap(),
+        String::from(name),
+        root_path
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use crate::aggregator::CircomInputProof;
 
-    use super::write_aggregated_input;
+    use super::{execute_circom, write_aggregated_input};
 
     #[test]
     fn test_aggregate_input() {
         let cp = CircomInputProof::empty();
         write_aggregated_input(String::from("./input.json"), cp);
+    }
+
+    #[test]
+    fn test_circom() {
+        let test = "./test.circom";
+        execute_circom(String::from(test));
     }
 }
