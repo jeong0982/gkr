@@ -1,7 +1,7 @@
 use std::{
     env::current_dir,
     fs::File,
-    io::{Read, Write},
+    io::Read,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -367,7 +367,8 @@ fn modify_circom_file(path: String, meta_value: &Meta) -> String {
     let mut is_added = false;
     for line in f_content.lines() {
         if line.eq("pragma circom 2.0.0;") {
-            let import = String::from("include \"../gkr-verifier-circuits/circom/circom/verifier.circom\";");
+            let import =
+                String::from("include \"../gkr-verifier-circuits/circom/circom/verifier.circom\";");
             new_circuit = format!("{}\n{}\n", line, import);
         } else if line.eq("}") && !is_added {
             new_circuit = format!("{}\n{}\n}}", new_circuit, s);
@@ -471,7 +472,7 @@ pub fn prove_all(circuit_path: String, input_paths: Vec<String>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{modify_circom_file, Meta, prove_all};
+    use super::{modify_circom_file, prove_all, Meta};
 
     #[test]
     fn test_print() {
@@ -487,6 +488,14 @@ mod tests {
         input_paths.push(String::from("./input1.json"));
         input_paths.push(String::from("./input2.json"));
         input_paths.push(String::from("./input3.json"));
+        prove_all(circuit_path, input_paths);
+    }
+
+    #[test]
+    fn test_single_proof() {
+        let circuit_path = String::from("./t.circom");
+        let mut input_paths = vec![];
+        input_paths.push(String::from("./input1.json"));
         prove_all(circuit_path, input_paths);
     }
 }

@@ -1,7 +1,7 @@
 use r1cs_file::{Constraint, FieldElement, R1csFile};
 use wtns_file::*;
 
-use crate::gkr::{poly::*, GKRCircuit, Input, Layer};
+use crate::{gkr::{poly::*, GKRCircuit, Input, Layer}, file_utils::stringify_fr};
 use halo2curves::bn256::Fr;
 use halo2curves::group::ff::PrimeField;
 use std::{collections::HashMap, fs::File, io::Read};
@@ -108,6 +108,7 @@ fn merge_nodes(
 }
 
 fn make_node_from_constraint(constraint: &Constraint<32>) -> IntermediateNode<FieldElement<32>> {
+    let one = FieldElement(Fr::one().to_repr());
     let a = &constraint.0;
     let b = &constraint.1;
     let c = &constraint.2;
@@ -116,35 +117,55 @@ fn make_node_from_constraint(constraint: &Constraint<32>) -> IntermediateNode<Fi
     let mut node_b = vec![];
     let mut node_c = vec![];
 
+    println!("{:?} {:?} {:?}", a.len(), b.len(), c.len());
     for (coeff, x_i) in a {
-        let left = IntermediateNode::new_from_value(coeff.clone());
-        let right = IntermediateNode::new_from_variable(x_i.clone());
-        let node = IntermediateNode::<FieldElement<32>> {
-            node_type: NodeType::Mult,
-            left: Some(Box::new(left)),
-            right: Some(Box::new(right)),
-        };
-        node_a.push(node);
+        let ieie = Fr::from_repr(coeff.0).unwrap();
+        println!("{:?}", stringify_fr(&ieie));
+        if coeff.clone() == one {
+            let node = IntermediateNode::new_from_variable(x_i.clone());
+            node_a.push(node);
+        } else {
+            let left = IntermediateNode::new_from_value(coeff.clone());
+            let right = IntermediateNode::new_from_variable(x_i.clone());
+            let node = IntermediateNode::<FieldElement<32>> {
+                node_type: NodeType::Mult,
+                left: Some(Box::new(left)),
+                right: Some(Box::new(right)),
+            };
+            node_a.push(node);
+        }
     }
     for (coeff, x_i) in b {
-        let left = IntermediateNode::new_from_value(coeff.clone());
-        let right = IntermediateNode::new_from_variable(x_i.clone());
-        let node = IntermediateNode::<FieldElement<32>> {
-            node_type: NodeType::Mult,
-            left: Some(Box::new(left)),
-            right: Some(Box::new(right)),
-        };
-        node_b.push(node);
+        if coeff.clone() == one {
+            let node = IntermediateNode::new_from_variable(x_i.clone());
+            node_b.push(node);
+        } else {
+            let left = IntermediateNode::new_from_value(coeff.clone());
+            let right = IntermediateNode::new_from_variable(x_i.clone());
+            let node = IntermediateNode::<FieldElement<32>> {
+                node_type: NodeType::Mult,
+                left: Some(Box::new(left)),
+                right: Some(Box::new(right)),
+            };
+            node_b.push(node);
+        }
     }
     for (coeff, x_i) in c {
-        let left = IntermediateNode::new_from_value(coeff.clone());
-        let right = IntermediateNode::new_from_variable(x_i.clone());
-        let node = IntermediateNode::<FieldElement<32>> {
-            node_type: NodeType::Mult,
-            left: Some(Box::new(left)),
-            right: Some(Box::new(right)),
-        };
-        node_c.push(node);
+        let ieie = Fr::from_repr(coeff.0).unwrap();
+        println!("{:?}", stringify_fr(&ieie));
+        if coeff.clone() == one {
+            let node = IntermediateNode::new_from_variable(x_i.clone());
+            node_c.push(node);
+        } else {
+            let left = IntermediateNode::new_from_value(coeff.clone());
+            let right = IntermediateNode::new_from_variable(x_i.clone());
+            let node = IntermediateNode::<FieldElement<32>> {
+                node_type: NodeType::Mult,
+                left: Some(Box::new(left)),
+                right: Some(Box::new(right)),
+            };
+            node_c.push(node);
+        }
     }
     if node_a.len() != 0 && node_b.len() != 0 {
         let root_a = merge_nodes(node_a);
@@ -219,10 +240,7 @@ fn compile(
         let mut node_types = vec![];
 
         let k = get_k(current_nodes.len());
-        let mut full_num = 2 << k;
-        if k == 0 {
-            full_num = 1;
-        }
+        let full_num = 1 << k;
         let diff = full_num - current_nodes.len();
         let added_zero_idx = current_nodes.len();
         for _ in 0..diff {
@@ -497,7 +515,9 @@ fn calculate_input(
     let d = get_multi_ext(&d_values, get_k(d_values.len()));
     w.push(d.clone());
     for (i, layer_value) in w_values.iter().enumerate() {
-        if i == 0 { continue; }
+        if i == 0 {
+            continue;
+        }
         w.push(get_multi_ext(layer_value, get_k(layer_value.len())));
     }
     Input { w, d }

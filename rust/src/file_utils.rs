@@ -7,7 +7,6 @@ use serde_json::{from_reader, from_str, Value};
 use std::collections::HashMap;
 use std::env::current_dir;
 use std::fs;
-use std::io::Write;
 use std::process::Command;
 
 use crate::aggregator::CircomInputProof;
@@ -92,8 +91,14 @@ pub fn execute_circom(path: String, input_path: &String) -> (String, String) {
     let name = circom_name[0];
 
     let witness_gen_name = format!("{}_js/", name);
-    let witness_gen_file = current_dir().unwrap().join(witness_gen_name.clone()).join("generate_witness.js");
-    let wasm = current_dir().unwrap().join(witness_gen_name).join(format!("{}.wasm", name));
+    let witness_gen_file = current_dir()
+        .unwrap()
+        .join(witness_gen_name.clone())
+        .join("generate_witness.js");
+    let wasm = current_dir()
+        .unwrap()
+        .join(witness_gen_name)
+        .join(format!("{}.wasm", name));
 
     let _ = Command::new("node")
         .arg(witness_gen_file.clone())
@@ -103,10 +108,7 @@ pub fn execute_circom(path: String, input_path: &String) -> (String, String) {
         .status()
         .expect("witness calculator generation failed");
     println!("");
-    (
-        String::from(name),
-        root_path
-    )
+    (String::from(name), root_path)
 }
 
 #[cfg(test)]

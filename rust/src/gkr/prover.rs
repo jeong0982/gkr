@@ -3,7 +3,10 @@ use ff::PrimeField;
 use mimc_rs::{Fr, Mimc7};
 use std::vec;
 
-pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(circuit: GKRCircuit<S>, input: Input<S>) -> Proof<S> {
+pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
+    circuit: GKRCircuit<S>,
+    input: Input<S>,
+) -> Proof<S> {
     let mimc = Mimc7::new(91);
 
     let mut sumcheck_proofs = vec![];

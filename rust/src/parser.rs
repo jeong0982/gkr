@@ -44,8 +44,8 @@ mod tests {
     #[test]
     fn test_wtns() {
         const FS: usize = 32;
-        let r1cs = R1csFile::<FS>::read(File::open("./main.r1cs").unwrap()).unwrap();
-        let wtns = WtnsFile::<FS>::read(File::open("./main.wtns").unwrap()).unwrap();
+        let r1cs = R1csFile::<FS>::read(File::open("./t.r1cs").unwrap()).unwrap();
+        let wtns = WtnsFile::<FS>::read(File::open("./witness.wtns").unwrap()).unwrap();
         println!("{}, {}", r1cs.header.n_labels, r1cs.header.n_wires);
         println!("{}", wtns.witness.0.len());
         for i in r1cs.map.0 {

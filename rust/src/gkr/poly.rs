@@ -1,6 +1,6 @@
 use ethers_core::types::U256;
 use ff::PrimeField;
-use std::{vec, collections::HashMap};
+use std::{collections::HashMap, vec};
 
 fn fe_to_u256<F>(f: F) -> U256
 where
@@ -191,7 +191,10 @@ fn extend_length<S: PrimeField>(f: &Vec<S>, l: usize) -> Vec<S> {
     }
 }
 
-pub fn add_poly<S: PrimeField + std::hash::Hash>(f1: &Vec<Vec<S>>, f2: &Vec<Vec<S>>) -> Vec<Vec<S>> {
+pub fn add_poly<S: PrimeField + std::hash::Hash>(
+    f1: &Vec<Vec<S>>,
+    f2: &Vec<Vec<S>>,
+) -> Vec<Vec<S>> {
     let mut map: HashMap<Vec<S>, S> = HashMap::new();
     let mut len1 = 0;
     let mut len2 = 0;
@@ -244,7 +247,10 @@ fn mult_mono<S: PrimeField>(t1: Vec<S>, t2: Vec<S>) -> Vec<S> {
     res
 }
 
-pub fn mult_poly<S: PrimeField + std::hash::Hash>(f1: &Vec<Vec<S>>, f2: &Vec<Vec<S>>) -> Vec<Vec<S>> {
+pub fn mult_poly<S: PrimeField + std::hash::Hash>(
+    f1: &Vec<Vec<S>>,
+    f2: &Vec<Vec<S>>,
+) -> Vec<Vec<S>> {
     let mut map: HashMap<Vec<S>, S> = HashMap::new();
     let len1 = f1[0].len();
     let len2 = f2[0].len();
