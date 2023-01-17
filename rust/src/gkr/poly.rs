@@ -1,6 +1,6 @@
 use ethers_core::types::U256;
 use ff::PrimeField;
-use std::vec;
+use std::{vec, collections::HashMap};
 
 fn fe_to_u256<F>(f: F) -> U256
 where
@@ -18,7 +18,7 @@ fn minus_one<S: PrimeField>() -> S {
 }
 
 fn constant_one<S: PrimeField>(l: usize) -> Vec<S> {
-    let mut vec = vec![S::zero(); l];
+    let mut vec = vec![S::zero(); l + 1];
     vec[0] = S::one();
     vec
 }
@@ -44,7 +44,8 @@ pub fn chi_w<S: PrimeField>(w: String) -> Vec<Vec<S>> {
         if w_i == '0' {
             let mut subres = vec![];
             let mut term = constant_one::<S>(l);
-            term[idx] = minus_one();
+            term[0] = minus_one();
+            term[idx] = S::one();
             let one = constant_one::<S>(l);
             subres.push(term);
             subres.push(one);
@@ -142,7 +143,7 @@ pub fn partial_eval<S: PrimeField<Repr = [u8; 32]>>(f: Vec<Vec<S>>, r: &Vec<S>) 
         let mut new_t = vec![];
         let mut constant = t[0];
         for i in 0..r.len() - 1 {
-            let x = fe_to_u256(t[i]).as_usize();
+            let x = fe_to_u256(t[i + 1]).as_usize();
             if x == 0 {
                 continue;
             }
@@ -190,18 +191,33 @@ fn extend_length<S: PrimeField>(f: &Vec<S>, l: usize) -> Vec<S> {
     }
 }
 
-pub fn add_poly<S: PrimeField>(f1: &Vec<Vec<S>>, f2: &Vec<Vec<S>>) -> Vec<Vec<S>> {
+pub fn add_poly<S: PrimeField + std::hash::Hash>(f1: &Vec<Vec<S>>, f2: &Vec<Vec<S>>) -> Vec<Vec<S>> {
+    let mut map: HashMap<Vec<S>, S> = HashMap::new();
     let len1 = f1[0].len();
     let len2 = f2[0].len();
     let len = if len1 > len2 { len1 } else { len2 };
     let mut res = vec![];
     for t in f1 {
         let t_ext = extend_length(t, len);
-        res.push(t_ext);
+        if map.contains_key(&t_ext[1..]) {
+            *map.get_mut(&t_ext[1..]).unwrap() += t_ext[0];
+        } else {
+            map.insert(t_ext[1..].to_vec(), t_ext[0]);
+        }
     }
     for t in f2 {
         let t_ext = extend_length(t, len);
-        res.push(t_ext);
+        if map.contains_key(&t_ext[1..]) {
+            *map.get_mut(&t_ext[1..]).unwrap() += t_ext[0];
+        } else {
+            map.insert(t_ext[1..].to_vec(), t_ext[0]);
+        }
+    }
+    for (poly, constant) in map.iter() {
+        let mut new_poly = vec![constant.clone()];
+        let mut p_cloned = poly.clone();
+        new_poly.append(&mut p_cloned);
+        res.push(new_poly)
     }
     res
 }
@@ -219,7 +235,8 @@ fn mult_mono<S: PrimeField>(t1: Vec<S>, t2: Vec<S>) -> Vec<S> {
     res
 }
 
-pub fn mult_poly<S: PrimeField>(f1: &Vec<Vec<S>>, f2: &Vec<Vec<S>>) -> Vec<Vec<S>> {
+pub fn mult_poly<S: PrimeField + std::hash::Hash>(f1: &Vec<Vec<S>>, f2: &Vec<Vec<S>>) -> Vec<Vec<S>> {
+    let mut map: HashMap<Vec<S>, S> = HashMap::new();
     let len1 = f1[0].len();
     let len2 = f2[0].len();
     let len = if len1 > len2 { len1 } else { len2 };
@@ -228,20 +245,30 @@ pub fn mult_poly<S: PrimeField>(f1: &Vec<Vec<S>>, f2: &Vec<Vec<S>>) -> Vec<Vec<S
 
     for t1 in f1 {
         for t2 in f2 {
-            res.push(mult_mono(extend_length(t1, len), extend_length(t2, len)));
+            let t = mult_mono(extend_length(t1, len), extend_length(t2, len));
+            if map.contains_key(&t[1..]) {
+                *map.get_mut(&t[1..]).unwrap() += t[0];
+            } else {
+                map.insert(t[1..].to_vec(), t[0]);
+            }
         }
     }
-
+    for (poly, constant) in map.iter() {
+        let mut new_poly = vec![constant.clone()];
+        let mut p_cloned = poly.clone();
+        new_poly.append(&mut p_cloned);
+        res.push(new_poly)
+    }
     res
 }
 
 pub fn get_univariate_coeff<S: PrimeField<Repr = [u8; 32]>>(f: &Vec<Vec<S>>, i: usize) -> Vec<S> {
-    let mut coeffs = vec![];
+    let mut coeffs = vec![S::one()];
     for t in f {
         let deg_u256 = fe_to_u256(t[i]);
         let deg = deg_u256.as_usize();
-        if coeffs.len() + 1 < deg {
-            let mut acc = vec![S::zero(); deg - coeffs.len()];
+        if coeffs.len() - 1 < deg {
+            let mut acc = vec![S::zero(); deg - coeffs.len() + 1];
             coeffs.append(&mut acc);
         }
         coeffs[deg] += t[0];
@@ -285,7 +312,7 @@ pub fn reduce_multiple_polynomial<S: PrimeField<Repr = [u8; 32]>>(
     w: Vec<Vec<S>>,
 ) -> Vec<S> {
     assert_eq!(b.len(), c.len());
-    let mut res = vec![];
+    let mut res = vec![S::zero()];
     let mut t = vec![];
     let iterator = b.iter().zip(c.iter());
     for (b_i, c_i) in iterator {

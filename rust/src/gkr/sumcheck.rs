@@ -19,7 +19,7 @@ pub fn convert_fr_to_s<S: PrimeField<Repr = [u8; 32]>>(v: mimc_rs::Fr) -> S {
     S::from_repr(v_bytes).unwrap()
 }
 
-pub fn prove_sumcheck<S: PrimeField<Repr = [u8; 32]>>(
+pub fn prove_sumcheck<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
     g: &Vec<Vec<S>>,
     v: usize,
 ) -> (Vec<Vec<S>>, Vec<S>) {
@@ -67,11 +67,9 @@ pub fn prove_sumcheck<S: PrimeField<Repr = [u8; 32]>>(
         let r_n = mimc.multi_hash(mimc_gj_coeffs, &Fr::from(0));
         r.push(convert_fr_to_s(r_n));
     }
-
     let g_v = partial_eval(g.clone(), &r);
-    let g_v_coeffs = get_univariate_coeff(&g_v, v);
+    let g_v_coeffs = get_univariate_coeff(&g_v, 1);
     proof.push(g_v_coeffs.clone());
-
     let mimc_gv_coeffs = g_v_coeffs.iter().map(|s| convert_s_to_fr(s)).collect();
     let r_v = mimc.multi_hash(mimc_gv_coeffs, &Fr::from(0));
     r.push(convert_fr_to_s(r_v));

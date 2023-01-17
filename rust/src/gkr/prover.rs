@@ -3,7 +3,7 @@ use ff::PrimeField;
 use mimc_rs::{Fr, Mimc7};
 use std::vec;
 
-pub fn prove<S: PrimeField<Repr = [u8; 32]>>(circuit: GKRCircuit<S>, input: Input<S>) -> Proof<S> {
+pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(circuit: GKRCircuit<S>, input: Input<S>) -> Proof<S> {
     let mimc = Mimc7::new(91);
 
     let mut sumcheck_proofs = vec![];
@@ -19,13 +19,24 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]>>(circuit: GKRCircuit<S>, input: Inpu
     z.push(z_zero);
 
     for i in 0..circuit.depth() - 1 {
+        println!("prove: layer {:?}", i);
         let add = circuit.add(i);
-        let add_res = partial_eval(add, &z[i]);
+        let mut add_res = vec![];
+        if z[i].len() == 0 {
+            add_res = add.clone();
+        } else {
+            add_res = partial_eval(add, &z[i]);
+        }
         let mult = circuit.mult(i);
-        let mult_res = partial_eval(mult, &z[i]);
+        let mut mult_res = vec![];
+        if z[i].len() == 0 {
+            mult_res = mult.clone();
+        } else {
+            mult_res = partial_eval(mult, &z[i]);
+        }
 
-        let w_i_ext_b = modify_poly_from_k(input.w(i), circuit.k(i));
-        let w_i_ext_c = modify_poly_from_k(input.w(i), circuit.k(i) + circuit.k(i + 1));
+        let w_i_ext_b = modify_poly_from_k(input.w(i + 1), circuit.k(i));
+        let w_i_ext_c = modify_poly_from_k(input.w(i + 1), circuit.k(i) + circuit.k(i + 1));
 
         let w_i_ext_add = add_poly(&w_i_ext_b, &w_i_ext_c);
         let first = mult_poly(&add_res, &w_i_ext_add);
@@ -34,7 +45,7 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]>>(circuit: GKRCircuit<S>, input: Inpu
         let second = mult_poly(&mult_res, &w_i_ext_mult);
 
         let f = add_poly(&first, &second);
-
+        println!("{:?}", f.len());
         let (sumcheck_proof, r) = prove_sumcheck(&f, 2 * circuit.k(i + 1));
         sumcheck_proofs.push(sumcheck_proof.clone());
         sumcheck_r.push(r.clone());
@@ -55,7 +66,7 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]>>(circuit: GKRCircuit<S>, input: Inpu
             if j == r.len() - 1 {
                 f_res.push(eval_univariate(&f_modified_uni, x))
             } else {
-                f_modified = partial_eval_i(&f_modified, x, j);
+                f_modified = partial_eval_i(&f_modified, x, j + 1);
                 if j == r.len() - 2 {
                     f_modified_uni = get_univariate_coeff(&f_modified, r.len() - 1);
                 }

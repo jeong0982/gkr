@@ -20,7 +20,7 @@ struct Data {
 
 pub fn stringify_fr(f: &Fr) -> String {
     let r = f.to_repr();
-    let mut s = String::from("0x");
+    let mut s = String::from("");
     for &b in r.iter().rev() {
         s = format!("{}{:02x}", s, b);
     }
@@ -42,7 +42,7 @@ fn make_output_value_map(output: Output<Fr>) -> Data {
 
 pub fn write_output(path: String, output: Output<Fr>) {
     let data = make_output_value_map(output);
-    let json_string = serde_json::to_string(&data).unwrap();
+    let json_string = serde_json::to_string(&data.value_map).unwrap();
 
     fs::write(path, json_string).expect("Unable to write file");
 }

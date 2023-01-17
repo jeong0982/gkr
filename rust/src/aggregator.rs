@@ -362,16 +362,18 @@ fn modify_circom_file(path: String, meta_value: &Meta) -> String {
     let mut f_content = String::new();
     f.read_to_string(&mut f_content).unwrap();
 
+    let mut is_added = false;
     for line in f_content.lines() {
-        if line.eq("}") {
+        if line.eq("}") && !is_added {
             new_circuit = format!("{}\n{}\n}}", new_circuit, s);
+            is_added = true;
         } else {
             new_circuit = format!("{}{}\n", new_circuit, line);
         }
     }
 
     let file_path = current_dir().unwrap().join("aggregated.circom");
-    std::fs::write(&file_path, new_circuit);
+    std::fs::write(&file_path, new_circuit).expect("Write new circuit failed");
     file_path.into_os_string().into_string().unwrap()
 }
 
@@ -388,7 +390,8 @@ pub fn prove_recursively_circom(
     let aggregated_input_path = write_aggregated_input(input_path, p);
     let aggregated_circuit_path = modify_circom_file(circuit_path.clone(), &meta);
 
-    let circom_result = execute_circom(aggregated_circuit_path);
+    let circom_result = execute_circom(aggregated_circuit_path.clone());
+    std::fs::remove_file(aggregated_circuit_path).expect("Remove failed");
     let name = circom_result.1;
     let r1cs_name = format!("{}.r1cs", name.clone());
     let sym_name = format!("{}.sym", name.clone());
@@ -399,7 +402,7 @@ pub fn prove_recursively_circom(
     let r1cs = R1csFile::<32>::read(File::open(r1cs_path).unwrap()).unwrap();
 
     let executable_path = circom_result.0;
-    let witcommand = Command::new(name)
+    let witcommand = Command::new(executable_path)
         .arg(aggregated_input_path.clone())
         .arg("witness.wtns")
         .status()
@@ -422,6 +425,7 @@ pub fn prove_groth(circuit_path: String, previous_proof: Proof<Fr>, input_path: 
     let p = CircomInputProof::new_from_proof(modified_proof);
     let aggregated_input_path = write_aggregated_input(input_path, p);
     let aggregated_circuit_path = modify_circom_file(circuit_path, &meta);
+    println!("Proving by groth..");
 }
 
 pub fn prove_all(circuit_path: String, input_paths: Vec<String>) {
@@ -442,12 +446,13 @@ pub fn prove_all(circuit_path: String, input_paths: Vec<String>) {
             let r1cs = R1csFile::<32>::read(File::open(r1cs_path).unwrap()).unwrap();
             let sym_name = format!("{}.sym", name.clone());
 
-            let witcommand = Command::new(name)
+            let _ = Command::new(executable_path)
                 .arg(input.clone())
                 .arg("witness.wtns")
                 .status()
                 .expect("Executable failed");
             let wtns_path = current_dir().unwrap().join("witness.wtns");
+            println!("Writing new witness");
             let wtns = WtnsFile::<32>::read(File::open(wtns_path).unwrap()).unwrap();
 
             let sym = format!("{}{}", root_path.clone(), sym_name);
@@ -473,12 +478,22 @@ pub fn prove_all(circuit_path: String, input_paths: Vec<String>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{modify_circom_file, Meta};
+    use super::{modify_circom_file, Meta, prove_all};
 
     #[test]
     fn test_print() {
         let meta = Meta(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
         modify_circom_file(String::from("."), &meta);
         panic!(".");
+    }
+
+    #[test]
+    fn test_proving() {
+        let circuit_path = String::from("./t.circom");
+        let mut input_paths = vec![];
+        input_paths.push(String::from("./input1.json"));
+        input_paths.push(String::from("./input2.json"));
+        input_paths.push(String::from("./input3.json"));
+        prove_all(circuit_path, input_paths);
     }
 }

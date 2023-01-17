@@ -183,11 +183,15 @@ fn make_node_from_constraint(constraint: &Constraint<32>) -> IntermediateNode<Fi
 fn get_k(n: usize) -> usize {
     let mut k = 0;
     let mut m = n;
-    while m > 0 {
+    while m > 1 {
         m >>= 1;
         k += 1;
     }
-    k
+    if n & (n - 1) == 0 {
+        k
+    } else {
+        k + 1
+    }
 }
 
 fn compile(
@@ -204,7 +208,6 @@ fn compile(
     if height == 0 {
         return (layers, vec![]);
     }
-
     let mut inputs = vec![];
 
     let mut used: HashMap<Expression<FieldElement<32>>, usize> = HashMap::new();
@@ -216,8 +219,11 @@ fn compile(
         let mut node_types = vec![];
 
         let k = get_k(current_nodes.len());
-        let full_num = 2 << k;
-        let diff = full_num - k;
+        let mut full_num = 2 << k;
+        if k == 0 {
+            full_num = 1;
+        }
+        let diff = full_num - current_nodes.len();
         let added_zero_idx = current_nodes.len();
         for _ in 0..diff {
             current_nodes.push(zero_node());
@@ -372,7 +378,7 @@ fn make_output(witness: Vec<wtns_file::FieldElement<32>>, sym: Vec<String>) -> O
         public
             .wire_map
             .insert(i + 1, Fr::from_repr(witness[i + 1].0).unwrap());
-        public.name_map.insert(i, sym[i].clone());
+        public.name_map.insert(i + 1, sym[i].clone());
     }
 
     public
@@ -407,7 +413,7 @@ pub fn convert_r1cs_wtns_gkr(
 
         let binary_inputs = generate_binary_string(v);
         for b in binary_inputs {
-            let curr = usize::from_str_radix(&b[0..k_i], 2).unwrap();
+            let curr = usize::from_str_radix(&b[0..k_i], 2).unwrap_or(0);
             let next_left = usize::from_str_radix(&b[k_i..k_i + k_next], 2).unwrap();
             let next_right = usize::from_str_radix(&b[k_i + k_next..], 2).unwrap();
             if layers[i].operand_index[curr] == (next_left, next_right) {
@@ -488,10 +494,11 @@ fn calculate_input(
     let mut w = vec![];
     // d = w[0]
     let d_values = w_values[0].clone();
-    let d = get_multi_ext(&d_values, d_values.len());
+    let d = get_multi_ext(&d_values, get_k(d_values.len()));
     w.push(d.clone());
-    for layer_value in w_values.iter() {
-        w.push(get_multi_ext(layer_value, layer_value.len()));
+    for (i, layer_value) in w_values.iter().enumerate() {
+        if i == 0 { continue; }
+        w.push(get_multi_ext(layer_value, get_k(layer_value.len())));
     }
     Input { w, d }
 }
