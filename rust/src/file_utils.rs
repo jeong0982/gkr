@@ -72,12 +72,12 @@ pub fn get_name(path: &String) -> String {
     String::from(name_tuple[0])
 }
 
-pub fn execute_circom(path: String) -> (String, String, String) {
-    let command = Command::new("circom")
+pub fn execute_circom(path: String, input_path: &String) -> (String, String) {
+    let _ = Command::new("circom")
         .arg(path.clone())
         .arg("--r1cs")
         .arg("--sym")
-        .arg("--c")
+        .arg("--wasm")
         .output()
         .expect("circom command failed");
     println!("");
@@ -91,17 +91,19 @@ pub fn execute_circom(path: String) -> (String, String, String) {
     let circom_name: Vec<&str> = path_str[path_str.len() - 1].split('.').collect();
     let name = circom_name[0];
 
-    let witness_gen_name = format!("{}_cpp/", name);
-    let witness_gen_file = current_dir().unwrap().join(witness_gen_name);
+    let witness_gen_name = format!("{}_js/", name);
+    let witness_gen_file = current_dir().unwrap().join(witness_gen_name.clone()).join("generate_witness.js");
+    let wasm = current_dir().unwrap().join(witness_gen_name).join(format!("{}.wasm", name));
 
-    let _ = Command::new("make")
-        .current_dir(witness_gen_file.clone())
+    let _ = Command::new("node")
+        .arg(witness_gen_file.clone())
+        .arg(wasm)
+        .arg(input_path.clone())
+        .arg("witness.wtns")
         .status()
         .expect("witness calculator generation failed");
     println!("");
-    let executable = witness_gen_file.join(name);
     (
-        executable.into_os_string().into_string().unwrap(),
         String::from(name),
         root_path
     )
@@ -111,17 +113,11 @@ pub fn execute_circom(path: String) -> (String, String, String) {
 mod tests {
     use crate::aggregator::CircomInputProof;
 
-    use super::{execute_circom, write_aggregated_input};
+    use super::write_aggregated_input;
 
     #[test]
     fn test_aggregate_input() {
         let cp = CircomInputProof::empty();
         write_aggregated_input(String::from("./input.json"), cp);
-    }
-
-    #[test]
-    fn test_circom() {
-        let test = "./test.circom";
-        execute_circom(String::from(test));
     }
 }

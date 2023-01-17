@@ -193,8 +193,14 @@ fn extend_length<S: PrimeField>(f: &Vec<S>, l: usize) -> Vec<S> {
 
 pub fn add_poly<S: PrimeField + std::hash::Hash>(f1: &Vec<Vec<S>>, f2: &Vec<Vec<S>>) -> Vec<Vec<S>> {
     let mut map: HashMap<Vec<S>, S> = HashMap::new();
-    let len1 = f1[0].len();
-    let len2 = f2[0].len();
+    let mut len1 = 0;
+    let mut len2 = 0;
+    if f1.len() != 0 {
+        len1 = f1[0].len();
+    }
+    if f2.len() != 0 {
+        len2 = f2[0].len();
+    }
     let len = if len1 > len2 { len1 } else { len2 };
     let mut res = vec![];
     for t in f1 {
@@ -214,6 +220,9 @@ pub fn add_poly<S: PrimeField + std::hash::Hash>(f1: &Vec<Vec<S>>, f2: &Vec<Vec<
         }
     }
     for (poly, constant) in map.iter() {
+        if constant.clone() == S::zero() {
+            continue;
+        }
         let mut new_poly = vec![constant.clone()];
         let mut p_cloned = poly.clone();
         new_poly.append(&mut p_cloned);

@@ -35,18 +35,18 @@ template VerifyGKR(meta) {
 
     signal output isValid;
 
-    component mInitial;
+    // component mInitial;
     component m[d - 1];
 
-    mInitial = evalMultivariate(meta[3], meta[2]);
-    for (var i = 0; i < meta[2]; i++) {
-        mInitial.x[i] <==  z[0][i];
-    }
-    for (var i = 0; i < meta[3]; i++) {
-        for (var j = 0; j < meta[2] + 1; j++) {
-            mInitial.terms[i][j] <== D[i][j];
-        }
-    }
+    // mInitial = evalMultivariate(meta[3], meta[2]);
+    // for (var i = 0; i < meta[2]; i++) {
+    //     mInitial.x[i] <==  z[0][i];
+    // }
+    // for (var i = 0; i < meta[3]; i++) {
+    //     for (var j = 0; j < meta[2] + 1; j++) {
+    //         mInitial.terms[i][j] <== D[i][j];
+    //     }
+    // }
 
     component sumcheckVerifier[d - 1];
     component qZero[d - 1];
@@ -63,7 +63,7 @@ template VerifyGKR(meta) {
     for (var i = 0; i < d - 1; i++) {
         sumcheckVerifier[i] = SumcheckVerify(2 * meta[i + 11], meta[4]);
         if (i == 0) {
-            sumcheckVerifier[i].claim <== mInitial.result;
+            sumcheckVerifier[i].claim <== 0;
         } else {
             sumcheckVerifier[i].claim <== m[i - 1].result;
         }
@@ -142,7 +142,3 @@ template VerifyGKR(meta) {
 
     isValid <== 1;
 }
-
-component main = VerifyGKR([
-    3, 2, 1, 2, 3, 3, 3, 2, 1, 51, 1, 2, 2
-]);

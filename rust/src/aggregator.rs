@@ -277,16 +277,18 @@ fn modify_proof_for_circom(proof: Proof<Fr>, meta_value: &Meta) -> Proof<Fr> {
 fn modify_circom_file(path: String, meta_value: &Meta) -> String {
     let mut added = Tera::default();
     let source = "
-    signal input sumcheckProof[d - 1][2 * largest_k][meta[4]];
+    var d = {{ meta_0 }};
+    var largest_k = {{ meta_1 }};
+    signal input sumcheckProof[d - 1][2 * largest_k][{{ meta_4 }}];
     signal input sumcheckr[d - 1][2 * largest_k];
-    signal input q[d - 1][meta[5]];
+    signal input q[d - 1][{{meta_5}}];
     signal input f[d - 1];
-    signal input D[meta[3]][meta[2] + 1];
+    signal input D[{{meta_3}}][{{meta_2}} + 1];
     signal input z[d][largest_k];
     signal input r[d - 1];
-    signal input inputFunc[meta[6]][meta[7] + 1];
-    signal input add[d - 1][meta[8]][3 * largest_k + 1];
-    signal input mult[d - 1][meta[9]][3 * largest_k + 1];
+    signal input inputFunc[{{meta_6}}][{{meta_7}} + 1];
+    signal input add[d - 1][{{meta_8}}][3 * largest_k + 1];
+    signal input mult[d - 1][{{meta_9}}][3 * largest_k + 1];
     signal output isValid;
     component verifier = VerifyGKR({{ meta }});
     var a = {{ meta_0 }} - 1;
@@ -364,7 +366,10 @@ fn modify_circom_file(path: String, meta_value: &Meta) -> String {
 
     let mut is_added = false;
     for line in f_content.lines() {
-        if line.eq("}") && !is_added {
+        if line.eq("pragma circom 2.0.0;") {
+            let import = String::from("include \"../gkr-verifier-circuits/circom/circom/verifier.circom\";");
+            new_circuit = format!("{}\n{}\n", line, import);
+        } else if line.eq("}") && !is_added {
             new_circuit = format!("{}\n{}\n}}", new_circuit, s);
             is_added = true;
         } else {
@@ -389,24 +394,18 @@ pub fn prove_recursively_circom(
     let input_name = get_name(&input_path);
     let aggregated_input_path = write_aggregated_input(input_path, p);
     let aggregated_circuit_path = modify_circom_file(circuit_path.clone(), &meta);
+    println!("{} generated", aggregated_circuit_path);
+    let circom_result = execute_circom(aggregated_circuit_path.clone(), &aggregated_input_path);
 
-    let circom_result = execute_circom(aggregated_circuit_path.clone());
-    std::fs::remove_file(aggregated_circuit_path).expect("Remove failed");
-    let name = circom_result.1;
+    let name = circom_result.0;
     let r1cs_name = format!("{}.r1cs", name.clone());
     let sym_name = format!("{}.sym", name.clone());
 
-    let root_path = circom_result.2;
+    let root_path = circom_result.1;
     let sym = format!("{}{}", root_path.clone(), sym_name);
     let r1cs_path = format!("{}{}", root_path.clone(), r1cs_name);
     let r1cs = R1csFile::<32>::read(File::open(r1cs_path).unwrap()).unwrap();
 
-    let executable_path = circom_result.0;
-    let witcommand = Command::new(executable_path)
-        .arg(aggregated_input_path.clone())
-        .arg("witness.wtns")
-        .status()
-        .expect("Executable failed");
     let wtns_path = current_dir().unwrap().join("witness.wtns");
     let wtns = WtnsFile::<32>::read(File::open(wtns_path).unwrap()).unwrap();
 
@@ -423,8 +422,8 @@ pub fn prove_groth(circuit_path: String, previous_proof: Proof<Fr>, input_path: 
     let meta = get_meta(&previous_proof);
     let modified_proof = modify_proof_for_circom(previous_proof, &meta);
     let p = CircomInputProof::new_from_proof(modified_proof);
-    let aggregated_input_path = write_aggregated_input(input_path, p);
-    let aggregated_circuit_path = modify_circom_file(circuit_path, &meta);
+    let _aggregated_input_path = write_aggregated_input(input_path, p);
+    let _aggregated_circuit_path = modify_circom_file(circuit_path, &meta);
     println!("Proving by groth..");
 }
 
@@ -434,10 +433,9 @@ pub fn prove_all(circuit_path: String, input_paths: Vec<String>) {
     let mut proof = None;
     for (i, input) in input_paths.iter().enumerate() {
         if i == 0 {
-            let circom_result = execute_circom(circuit_path.clone());
-            let executable_path = circom_result.0;
-            let name = circom_result.1;
-            let root_path = circom_result.2;
+            let circom_result = execute_circom(circuit_path.clone(), input);
+            let name = circom_result.0;
+            let root_path = circom_result.1;
 
             let input_name = get_name(input);
 
@@ -446,11 +444,6 @@ pub fn prove_all(circuit_path: String, input_paths: Vec<String>) {
             let r1cs = R1csFile::<32>::read(File::open(r1cs_path).unwrap()).unwrap();
             let sym_name = format!("{}.sym", name.clone());
 
-            let _ = Command::new(executable_path)
-                .arg(input.clone())
-                .arg("witness.wtns")
-                .status()
-                .expect("Executable failed");
             let wtns_path = current_dir().unwrap().join("witness.wtns");
             println!("Writing new witness");
             let wtns = WtnsFile::<32>::read(File::open(wtns_path).unwrap()).unwrap();
