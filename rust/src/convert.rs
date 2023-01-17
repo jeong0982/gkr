@@ -1,7 +1,10 @@
 use r1cs_file::{Constraint, FieldElement, R1csFile};
 use wtns_file::*;
 
-use crate::{gkr::{poly::*, GKRCircuit, Input, Layer}, file_utils::stringify_fr};
+use crate::{
+    file_utils::stringify_fr,
+    gkr::{poly::*, GKRCircuit, Input, Layer},
+};
 use halo2curves::bn256::Fr;
 use halo2curves::group::ff::PrimeField;
 use std::{collections::HashMap, fs::File, io::Read};
@@ -117,10 +120,7 @@ fn make_node_from_constraint(constraint: &Constraint<32>) -> IntermediateNode<Fi
     let mut node_b = vec![];
     let mut node_c = vec![];
 
-    println!("{:?} {:?} {:?}", a.len(), b.len(), c.len());
     for (coeff, x_i) in a {
-        let ieie = Fr::from_repr(coeff.0).unwrap();
-        println!("{:?}", stringify_fr(&ieie));
         if coeff.clone() == one {
             let node = IntermediateNode::new_from_variable(x_i.clone());
             node_a.push(node);
@@ -151,8 +151,6 @@ fn make_node_from_constraint(constraint: &Constraint<32>) -> IntermediateNode<Fi
         }
     }
     for (coeff, x_i) in c {
-        let ieie = Fr::from_repr(coeff.0).unwrap();
-        println!("{:?}", stringify_fr(&ieie));
         if coeff.clone() == one {
             let node = IntermediateNode::new_from_variable(x_i.clone());
             node_c.push(node);

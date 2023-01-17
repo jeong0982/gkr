@@ -22,7 +22,6 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
     z.push(z_zero);
 
     for i in 0..circuit.depth() - 1 {
-        println!("prove: layer {:?}", i);
         let add = circuit.add(i);
         let mut add_res = vec![];
         if z[i].len() == 0 {
@@ -48,7 +47,6 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         let second = mult_poly(&mult_res, &w_i_ext_mult);
 
         let f = add_poly(&first, &second);
-        println!("{:?}", f.len());
         let (sumcheck_proof, r) = prove_sumcheck(&f, 2 * circuit.k(i + 1));
         sumcheck_proofs.push(sumcheck_proof.clone());
         sumcheck_r.push(r.clone());
