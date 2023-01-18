@@ -138,11 +138,14 @@ pub fn partial_eval_i<S: PrimeField<Repr = [u8; 32]>>(
 
 pub fn partial_eval<S: PrimeField<Repr = [u8; 32]>>(f: Vec<Vec<S>>, r: &Vec<S>) -> Vec<Vec<S>> {
     assert!(f[0].len() > r.len());
+    if r.len() == 0 {
+        return f;
+    }
     let mut res_f = vec![];
     for t in f.iter() {
         let mut new_t = vec![];
         let mut constant = t[0];
-        for i in 0..r.len() - 1 {
+        for i in 0..r.len() {
             let x = fe_to_u256(t[i + 1]).as_usize();
             if x == 0 {
                 continue;
@@ -288,6 +291,7 @@ pub fn get_univariate_coeff<S: PrimeField<Repr = [u8; 32]>>(f: &Vec<Vec<S>>, i: 
         }
         coeffs[deg] += t[0];
     }
+    coeffs.reverse();
     coeffs
 }
 

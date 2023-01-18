@@ -32,7 +32,7 @@ pub fn prove_sumcheck<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
     for assignment in assignments {
         let mut g_1_sub = g.clone();
         for (i, x_i) in assignment.into_iter().enumerate() {
-            let idx = i + 1;
+            let idx = i + 2;
             g_1_sub = partial_eval_i(&g_1_sub, &x_i, idx);
         }
         g_1 = add_poly(&g_1, &g_1_sub);
