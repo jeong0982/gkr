@@ -45,7 +45,7 @@ pub fn prove_sumcheck<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
     r.push(convert_fr_to_s(r_1));
 
     for j in 1..v - 1 {
-        let mut g_j: Vec<Vec<S>> = get_empty(v);
+        let mut g_j: Vec<Vec<S>> = g.clone();
         let assignments: Vec<Vec<S>> = generate_binary(v - j - 1);
 
         for (i, r_i) in r.iter().enumerate() {

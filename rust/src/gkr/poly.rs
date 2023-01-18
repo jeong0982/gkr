@@ -278,7 +278,7 @@ pub fn mult_poly<S: PrimeField + std::hash::Hash>(
 }
 
 pub fn get_univariate_coeff<S: PrimeField<Repr = [u8; 32]>>(f: &Vec<Vec<S>>, i: usize) -> Vec<S> {
-    let mut coeffs = vec![S::one()];
+    let mut coeffs = vec![S::zero()];
     for t in f {
         let deg_u256 = fe_to_u256(t[i]);
         let deg = deg_u256.as_usize();

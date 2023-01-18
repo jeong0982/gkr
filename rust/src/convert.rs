@@ -249,6 +249,7 @@ fn compile(
                 .iter()
                 .map(|node| node.node_type.clone())
                 .collect();
+            break;
         }
         if d == height - 1 {
             for node in current_nodes.iter() {
@@ -294,6 +295,14 @@ fn compile(
                     }
                 }
             }
+            layers.push(IntermediateLayer {
+                node_types,
+                operand_index: layer_operand_idx,
+            });
+            zero_index = None;
+            current_nodes = next_nodes;
+            next_nodes = vec![];
+            used = HashMap::new();
             continue;
         }
 
@@ -409,6 +418,7 @@ pub fn convert_r1cs_wtns_gkr(
     let layers = circuit_info.0;
     let input = circuit_info.1;
 
+    let mut input_k = get_k(input.len());
     let input_gkr = calculate_input(layers.clone(), input, &wtns.witness);
     let output_gkr = make_output(
         wtns.witness.0,
@@ -458,7 +468,7 @@ pub fn convert_r1cs_wtns_gkr(
         }
         gkr_layers.push(Layer::new(k_i, add_i, mult_i));
     }
-    (GKRCircuit::new(gkr_layers), input_gkr, output_gkr)
+    (GKRCircuit::new(gkr_layers, input_k), input_gkr, output_gkr)
 }
 
 fn calculate_input(

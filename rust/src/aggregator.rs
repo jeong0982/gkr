@@ -1,10 +1,4 @@
-use std::{
-    env::current_dir,
-    fs::File,
-    io::Read,
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::{env::current_dir, fs::File, io::Read, path::PathBuf, process::Command};
 
 use crate::{
     convert::{convert_r1cs_wtns_gkr, Output},
@@ -147,7 +141,7 @@ fn get_meta(proof: &Proof<Fr>) -> Meta {
     meta.push(largest_terms_q);
 
     // meta[6] = # of terms in w_d
-    let n_terms_input_func = proof.input_func.iter().map(|p| p.len()).max().unwrap();
+    let n_terms_input_func = proof.input_func.len();
     meta.push(n_terms_input_func);
 
     // meta[7] = k_i(d - 1)

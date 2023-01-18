@@ -49,11 +49,12 @@ impl<S: PrimeField> Layer<S> {
 
 pub struct GKRCircuit<S: PrimeField> {
     pub layer: Vec<Layer<S>>,
+    input_k: usize,
 }
 
 impl<S: PrimeField> GKRCircuit<S> {
-    pub fn new(layer: Vec<Layer<S>>) -> Self {
-        GKRCircuit { layer }
+    pub fn new(layer: Vec<Layer<S>>, input_k: usize) -> Self {
+        GKRCircuit { layer, input_k }
     }
 
     pub fn depth(&self) -> usize {
@@ -69,6 +70,9 @@ impl<S: PrimeField> GKRCircuit<S> {
     }
 
     pub fn k(&self, i: usize) -> usize {
+        if i == self.layer.len() {
+            return self.input_k;
+        }
         self.layer[i].k
     }
 
@@ -77,6 +81,7 @@ impl<S: PrimeField> GKRCircuit<S> {
         for i in 0..self.depth() {
             ks.push(self.k(i));
         }
+        ks.push(self.input_k);
         ks
     }
 

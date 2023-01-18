@@ -21,7 +21,7 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
     let mut z = vec![];
     z.push(z_zero);
 
-    for i in 0..circuit.depth() - 1 {
+    for i in 0..circuit.depth() {
         let add = circuit.add(i);
         let mut add_res = vec![];
         if z[i].len() == 0 {
@@ -37,8 +37,8 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
             mult_res = partial_eval(mult, &z[i]);
         }
 
-        let w_i_ext_b = modify_poly_from_k(input.w(i + 1), circuit.k(i));
-        let w_i_ext_c = modify_poly_from_k(input.w(i + 1), circuit.k(i) + circuit.k(i + 1));
+        let w_i_ext_b = modify_poly_from_k(input.w(i + 1), 0);
+        let w_i_ext_c = modify_poly_from_k(input.w(i + 1), circuit.k(i + 1));
 
         let w_i_ext_add = add_poly(&w_i_ext_b, &w_i_ext_c);
         let first = mult_poly(&add_res, &w_i_ext_add);
@@ -69,7 +69,7 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
             } else {
                 f_modified = partial_eval_i(&f_modified, x, j + 1);
                 if j == r.len() - 2 {
-                    f_modified_uni = get_univariate_coeff(&f_modified, r.len() - 1);
+                    f_modified_uni = get_univariate_coeff(&f_modified, r.len());
                 }
             }
         }
@@ -93,8 +93,8 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         q,
         z,
         r: r_stars,
-        depth: circuit.depth(),
-        input_func: input.w(circuit.depth() - 1),
+        depth: circuit.depth() + 1,
+        input_func: input.w(circuit.depth()),
         add: circuit.get_add_list(),
         mult: circuit.get_mult_list(),
         k: circuit.get_k_list(),
