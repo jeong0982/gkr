@@ -3,7 +3,7 @@ use std::{env::current_dir, fs::File, io::Read, path::PathBuf, process::Command}
 use crate::{
     convert::{convert_r1cs_wtns_gkr, Output},
     file_utils::{execute_circom, get_name, stringify_fr, write_aggregated_input, write_output},
-    gkr::{prover, Proof},
+    gkr::{poly::eval_univariate, prover, Proof},
 };
 use halo2curves::bn256::Fr;
 use r1cs_file::*;

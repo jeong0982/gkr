@@ -124,7 +124,7 @@ pub fn partial_eval_i<S: PrimeField<Repr = [u8; 32]>>(
     for t in f.iter() {
         let mut new_t = t.clone();
         let exp = fe_to_u256(t[i]).as_usize();
-        let mut x_pow = *x;
+        let mut x_pow = S::one();
         for _ in 0..exp {
             x_pow *= x;
         }
@@ -255,8 +255,14 @@ pub fn mult_poly<S: PrimeField + std::hash::Hash>(
     f2: &Vec<Vec<S>>,
 ) -> Vec<Vec<S>> {
     let mut map: HashMap<Vec<S>, S> = HashMap::new();
-    let len1 = f1[0].len();
-    let len2 = f2[0].len();
+    let mut len1 = 0;
+    let mut len2 = 0;
+    if f1.len() != 0 {
+        len1 = f1[0].len();
+    }
+    if f2.len() != 0 {
+        len2 = f2[0].len();
+    }
     let len = if len1 > len2 { len1 } else { len2 };
 
     let mut res = vec![];
@@ -272,6 +278,9 @@ pub fn mult_poly<S: PrimeField + std::hash::Hash>(
         }
     }
     for (poly, constant) in map.iter() {
+        if constant.clone() == S::zero() {
+            continue;
+        }
         let mut new_poly = vec![constant.clone()];
         let mut p_cloned = poly.clone();
         new_poly.append(&mut p_cloned);
@@ -298,30 +307,42 @@ pub fn get_univariate_coeff<S: PrimeField<Repr = [u8; 32]>>(f: &Vec<Vec<S>>, i: 
 fn mult_univariate<S: PrimeField<Repr = [u8; 32]>>(p: Vec<S>, q: Vec<S>) -> Vec<S> {
     let h_deg_p = p.len() - 1;
     let h_deg_q = q.len() - 1;
+    let mut p_rev = p.clone();
+    let mut q_rev = q.clone();
+    p_rev.reverse();
+    q_rev.reverse();
+
     let h_deg = h_deg_p + h_deg_q;
     let mut res = vec![S::zero(); h_deg + 1];
-    for (i, p_i) in p.iter().enumerate() {
-        for (j, q_i) in q.iter().enumerate() {
+
+    for (i, p_i) in p_rev.iter().enumerate() {
+        for (j, q_i) in q_rev.iter().enumerate() {
             let deg = i + j;
             let coeff = *p_i * (*q_i);
             res[deg] += coeff;
         }
     }
+    res.reverse();
     res
 }
 
 fn add_univariate<S: PrimeField<Repr = [u8; 32]>>(p: Vec<S>, q: Vec<S>) -> Vec<S> {
     let h_deg = std::cmp::max(p.len(), q.len());
+    let mut p_rev = p.clone();
+    let mut q_rev = q.clone();
+    p_rev.reverse();
+    q_rev.reverse();
     let mut res = vec![S::zero(); h_deg];
     for i in 0..h_deg {
         if i > p.len() - 1 {
-            res[i] = q[i];
+            res[i] = q_rev[i];
         } else if i > q.len() - 1 {
-            res[i] = p[i];
+            res[i] = p_rev[i];
         } else {
-            res[i] = p[i] + q[i];
+            res[i] = p_rev[i] + q_rev[i];
         }
     }
+    res.reverse();
     res
 }
 
@@ -343,13 +364,13 @@ pub fn reduce_multiple_polynomial<S: PrimeField<Repr = [u8; 32]>>(
         let mut new_poly = vec![S::one()];
         for (i, d) in terms.iter().enumerate() {
             if i == 0 {
-                new_poly[0] = *d;
+                new_poly[0] = d.clone();
                 continue;
             }
             let idx = i - 1;
             let deg = fe_to_u256(*d).as_usize();
             for _ in 0..deg {
-                let term = vec![t[idx].0, t[idx].1];
+                let term = vec![t[idx].1, t[idx].0];
                 new_poly = mult_univariate(new_poly, term);
             }
         }

@@ -85,7 +85,7 @@ pub fn execute_circom(path: String, input_path: &String) -> (String, String) {
     path_cloned.pop();
     let mut root_path = String::new();
     for slice in path_cloned {
-        root_path = format!("{}/", slice);
+        root_path = format!("{}{}/", root_path, slice);
     }
     let circom_name: Vec<&str> = path_str[path_str.len() - 1].split('.').collect();
     let name = circom_name[0];

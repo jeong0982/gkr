@@ -21,16 +21,16 @@ struct Args {
 }
 
 fn main() -> Result<()> {
-    let args = Args::parse();
+    // let args = Args::parse();
 
-    const FS: usize = 32;
-    let r1cs = R1csFile::<FS>::read(File::open(args.r1cs_file)?)?;
-    let wtns = WtnsFile::<FS>::read(File::open(args.wtns_file)?)?;
-    let sym = args.sym_file;
+    // const FS: usize = 32;
+    // let r1cs = R1csFile::<FS>::read(File::open(args.r1cs_file)?)?;
+    // let wtns = WtnsFile::<FS>::read(File::open(args.wtns_file)?)?;
+    // let sym = args.sym_file;
 
-    let result = convert_r1cs_wtns_gkr(r1cs, wtns, sym);
-    let proof = prover::prove(result.0, result.1);
-    write_output(args.output_path, result.2);
+    // let result = convert_r1cs_wtns_gkr(r1cs, wtns, sym);
+    // let proof = prover::prove(result.0, result.1);
+    // write_output(args.output_path, result.2);
 
     Ok(())
 }

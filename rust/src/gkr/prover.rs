@@ -37,7 +37,7 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
             mult_res = partial_eval(mult, &z[i]);
         }
 
-        let w_i_ext_b = modify_poly_from_k(input.w(i + 1), 0);
+        let w_i_ext_b = input.w(i + 1).clone();
         let w_i_ext_c = modify_poly_from_k(input.w(i + 1), circuit.k(i + 1));
 
         let w_i_ext_add = add_poly(&w_i_ext_b, &w_i_ext_c);

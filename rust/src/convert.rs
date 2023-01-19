@@ -86,7 +86,7 @@ fn merge_nodes(
     }
 
     let mut new = vec![];
-    let width = nodes.len() / 2 - 1;
+    let mut width = nodes.len() / 2;
     for i in 0..width {
         let left = nodes[2 * i].clone();
         let right = nodes[2 * i + 1].clone();
@@ -219,6 +219,7 @@ fn compile(
     Vec<IntermediateLayer<FieldElement<32>>>,
     Vec<NodeType<FieldElement<32>>>,
 ) {
+    println!("Compile nodes..");
     let mut layers = vec![];
 
     let zero = FieldElement::from((Fr::zero()).to_repr());
@@ -415,15 +416,19 @@ pub fn convert_r1cs_wtns_gkr(
     sym: String,
 ) -> (GKRCircuit<Fr>, Input<Fr>, Output<Fr>) {
     let circuit_info = compile(convert_constraints_to_nodes(&r1cs));
+    println!("r1cs is converted to GKR intermediate layers");
+
     let layers = circuit_info.0;
     let input = circuit_info.1;
 
     let mut input_k = get_k(input.len());
     let input_gkr = calculate_input(layers.clone(), input, &wtns.witness);
+    println!("All inputs are calculated");
     let output_gkr = make_output(
         wtns.witness.0,
         parse_sym(sym, r1cs.header.n_pub_in + r1cs.header.n_pub_out),
     );
+    println!("Layer depth: {:?}", layers.len());
 
     let mut gkr_layers = vec![];
     for i in 0..(layers.len() - 1) {
