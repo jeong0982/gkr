@@ -7,15 +7,16 @@ use crate::{
 };
 use halo2curves::bn256::Fr;
 use halo2curves::group::ff::PrimeField;
-use std::{collections::HashMap, fs::File, io::Read};
+use rayon::prelude::*;
+use std::{collections::HashMap, fmt::Debug, fs::File, io::Read, ops::Deref};
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 enum Expression<T> {
     Value(T),
     Variable(u32),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NodeType<T> {
     Mult,
     Add,
@@ -27,6 +28,32 @@ struct IntermediateNode<T> {
     node_type: NodeType<T>,
     left: Option<Box<IntermediateNode<T>>>,
     right: Option<Box<IntermediateNode<T>>>,
+}
+
+impl<T: PartialEq + Debug> PartialEq for IntermediateNode<T> {
+    fn eq(&self, other: &IntermediateNode<T>) -> bool {
+        let mut property = self.node_type == other.node_type;
+        if !((self.left.is_some() == other.left.is_some())
+            && (self.right.is_some() == self.right.is_some()))
+        {
+            return false;
+        }
+        if self.left.is_some() && other.left.is_some() {
+            property &= self.left.as_ref().unwrap().deref().eq(other
+                .left
+                .as_ref()
+                .unwrap()
+                .deref());
+        }
+        if self.right.is_some() && other.right.is_some() {
+            property &= self.right.as_ref().unwrap().deref().eq(other
+                .right
+                .as_ref()
+                .unwrap()
+                .deref());
+        }
+        return property;
+    }
 }
 
 impl<T: Copy> IntermediateNode<T> {
@@ -86,7 +113,7 @@ fn merge_nodes(
     }
 
     let mut new = vec![];
-    let mut width = nodes.len() / 2;
+    let width = nodes.len() / 2;
     for i in 0..width {
         let left = nodes[2 * i].clone();
         let right = nodes[2 * i + 1].clone();
@@ -237,11 +264,10 @@ fn compile(
     for d in 0..(height + 1) {
         let mut layer_operand_idx = vec![];
         let mut node_types = vec![];
-
+        println!("n leng {:?}", current_nodes.len());
         let k = get_k(current_nodes.len());
         let full_num = 1 << k;
         let diff = full_num - current_nodes.len();
-        let added_zero_idx = current_nodes.len();
         for _ in 0..diff {
             current_nodes.push(zero_node());
         }
@@ -311,14 +337,30 @@ fn compile(
             match node.node_type {
                 NodeType::Mult | NodeType::Add => {
                     node_types.push(node.node_type);
-                    let operand_index = (next_nodes.len(), next_nodes.len() + 1);
+                    let left = node.left.as_ref().unwrap().deref();
+                    let right = node.right.as_ref().unwrap().deref();
+
+                    let mut left_index = next_nodes.len();
+                    let mut right_index = next_nodes.len();
+
+                    if next_nodes.contains(left) {
+                        left_index = next_nodes.iter().position(|node| node == left).unwrap();
+                    } else {
+                        node.left
+                            .as_ref()
+                            .map(|node| next_nodes.push(*(node.clone())));
+                        left_index = next_nodes.len() - 1;
+                    }
+                    if next_nodes.contains(right) {
+                        right_index = next_nodes.iter().position(|node| node == right).unwrap();
+                    } else {
+                        node.right
+                            .as_ref()
+                            .map(|node| next_nodes.push(*(node.clone())));
+                        right_index = next_nodes.len() - 1;
+                    }
+                    let operand_index = (left_index, right_index);
                     layer_operand_idx.push(operand_index);
-                    node.left
-                        .as_ref()
-                        .map(|node| next_nodes.push(*(node.clone())));
-                    node.right
-                        .as_ref()
-                        .map(|node| next_nodes.push(*(node.clone())));
                 }
                 NodeType::Value(e) => {
                     if used.contains_key(&e) {
@@ -432,6 +474,7 @@ pub fn convert_r1cs_wtns_gkr(
 
     let mut gkr_layers = vec![];
     for i in 0..(layers.len() - 1) {
+        println!("{:?} layer starts", i);
         let k_i = get_k(layers[i].node_types.len());
         let k_next = get_k(layers[i + 1].node_types.len());
         let v = k_i + 2 * k_next;
@@ -442,34 +485,34 @@ pub fn convert_r1cs_wtns_gkr(
         let mut add_m = false;
         let mut mult_m = false;
 
-        let binary_inputs = generate_binary_string(v);
-        for b in binary_inputs {
+        let binary_inputs: Vec<String> = generate_binary_string(v);
+        add_i = binary_inputs.par_iter()
+        .filter(|b| {
             let curr = usize::from_str_radix(&b[0..k_i], 2).unwrap_or(0);
             let next_left = usize::from_str_radix(&b[k_i..k_i + k_next], 2).unwrap();
             let next_right = usize::from_str_radix(&b[k_i + k_next..], 2).unwrap();
-            if layers[i].operand_index[curr] == (next_left, next_right) {
-                match layers[i].node_types[curr] {
-                    NodeType::Add => {
-                        if !add_m {
-                            add_i = chi_w::<Fr>(b);
-                            add_m = true;
-                        } else {
-                            add_i.append(&mut chi_w::<Fr>(b));
-                        }
-                    }
-                    NodeType::Mult => {
-                        if !mult_m {
-                            mult_i = chi_w::<Fr>(b);
-                            mult_m = true;
-                        } else {
-                            mult_i.append(&mut chi_w::<Fr>(b));
-                        }
-                    }
-                    NodeType::Value(_) => {
-                        panic!("Circuit modification error");
-                    }
-                }
-            }
+            layers[i].operand_index[curr] == (next_left, next_right)
+                && layers[i].node_types[curr] == NodeType::Add
+        })
+        .map(|b| chi_w_for_binary::<Fr>(b))
+        .reduce(|| get_empty::<Fr>(v - 1), |a, b| add_cb(&a, &b));
+
+        mult_i = binary_inputs.par_iter()
+        .filter(|b| {
+            let curr = usize::from_str_radix(&b[0..k_i], 2).unwrap_or(0);
+            let next_left = usize::from_str_radix(&b[k_i..k_i + k_next], 2).unwrap();
+            let next_right = usize::from_str_radix(&b[k_i + k_next..], 2).unwrap();
+            layers[i].operand_index[curr] == (next_left, next_right)
+                && layers[i].node_types[curr] == NodeType::Mult
+            })
+            .map(|b| chi_w_for_binary::<Fr>(b))
+            .reduce(|| get_empty::<Fr>(v - 1), |a, b| add_cb(&a, &b));
+        
+        if add_i.len() == 0 {
+            add_i = get_empty::<Fr>(v - 1);
+        }
+        if mult_i.len() == 0 {
+            mult_i = get_empty::<Fr>(v - 1);
         }
         gkr_layers.push(Layer::new(k_i, add_i, mult_i));
     }

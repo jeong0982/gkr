@@ -338,7 +338,6 @@ fn modify_circom_file(path: String, meta_value: &Meta) -> String {
             }
         }
     }
-    isValid <== verifier.isValid;
     ";
     added.add_raw_template("verifier", source).unwrap();
     let mut ctxt = Context::new();

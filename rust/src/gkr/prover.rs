@@ -27,14 +27,14 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         if z[i].len() == 0 {
             add_res = add.clone();
         } else {
-            add_res = partial_eval(add, &z[i]);
+            add_res = partial_eval_binary_form(add, &z[i]);
         }
         let mult = circuit.mult(i);
         let mut mult_res = vec![];
         if z[i].len() == 0 {
             mult_res = mult.clone();
         } else {
-            mult_res = partial_eval(mult, &z[i]);
+            mult_res = partial_eval_binary_form(mult, &z[i]);
         }
 
         let w_i_ext_b = input.w(i + 1).clone();

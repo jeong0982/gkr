@@ -36,9 +36,32 @@ fn mult_multi_poly<S: PrimeField>(l: &Vec<S>, r: &Vec<S>) -> Vec<S> {
     res
 }
 
-pub fn chi_w<S: PrimeField>(w: String) -> Vec<Vec<S>> {
-    let mut prod = Vec::new();
+
+/// For add_i and mult_i, they have only two types for term, x or 1 - x.
+/// Represent x as 1, (1 - x) as 2.
+pub fn chi_w_for_binary<S: PrimeField>(w: &String) -> Vec<Vec<S>> {
     let l = w.len();
+    let mut prod = vec![S::zero(); l];
+    for (i, w_i) in w.chars().enumerate() {
+        if w_i == '0' {
+            prod[i] = S::one();
+        } else if w_i == '1' {
+            prod[i] = S::one() + S::one();
+        }
+    }
+    vec![prod]
+}
+
+pub fn add_cb<S: PrimeField>(a: &Vec<Vec<S>>, b: &Vec<Vec<S>>) -> Vec<Vec<S>> {
+    let mut res = a.clone();
+    res.append(&mut b.clone());
+    res
+}
+
+pub fn chi_w<S: PrimeField>(w: &String) -> Vec<Vec<S>> {
+    let l = w.len();
+    let mut prod_single = constant_one::<S>(l);
+    let mut prod_double = Vec::new();
     for (i, w_i) in w.chars().enumerate() {
         let idx = i + 1;
         if w_i == '0' {
@@ -49,18 +72,13 @@ pub fn chi_w<S: PrimeField>(w: String) -> Vec<Vec<S>> {
             let one = constant_one::<S>(l);
             subres.push(term);
             subres.push(one);
-            prod.push(subres);
+            prod_double.push(subres);
         } else if w_i == '1' {
-            let mut term = constant_one::<S>(l);
-            term[idx] = S::one();
-            let mut subres = vec![];
-            subres.push(term);
-            prod.push(subres);
+            prod_single[idx] = S::one();
         }
     }
-    let mut res = vec![];
-    res.push(constant_one::<S>(l));
-    for poly in prod {
+    let mut res = vec![prod_single];
+    for poly in prod_double {
         let mut new_res = vec![];
         for term in poly.iter() {
             for res_term in res.iter() {
@@ -388,7 +406,7 @@ pub fn get_multi_ext<S: PrimeField<Repr = [u8; 32]>>(value: &Vec<S>, v: usize) -
         if val == S::zero() {
             continue;
         }
-        let mut res = chi_w::<S>(b);
+        let mut res = chi_w::<S>(&b);
         for i in 0..res.len() {
             res[i][0] *= val
         }
