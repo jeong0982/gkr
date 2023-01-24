@@ -56,7 +56,7 @@ pub fn write_aggregated_input(path: String, input: CircomInputProof) -> String {
     for (k, v) in proof_data {
         input_json.insert(k, v);
     }
-    let json_string = serde_json::to_string(&input_json).unwrap();
+    let json_string = serde_json::to_string_pretty(&input_json).unwrap();
 
     let root = current_dir().unwrap();
     let new_path = root.join("aggregated.json");

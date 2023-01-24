@@ -36,26 +36,63 @@ fn mult_multi_poly<S: PrimeField>(l: &Vec<S>, r: &Vec<S>) -> Vec<S> {
     res
 }
 
-
 /// For add_i and mult_i, they have only two types for term, x or 1 - x.
 /// Represent x as 1, (1 - x) as 2.
 pub fn chi_w_for_binary<S: PrimeField>(w: &String) -> Vec<Vec<S>> {
     let l = w.len();
-    let mut prod = vec![S::zero(); l];
+    let mut prod = constant_one::<S>(l);
     for (i, w_i) in w.chars().enumerate() {
         if w_i == '0' {
-            prod[i] = S::one();
+            // 1 - x_i
+            prod[i + 1] = S::one();
         } else if w_i == '1' {
-            prod[i] = S::one() + S::one();
+            // x_i
+            prod[i + 1] = S::one() + S::one();
         }
     }
     vec![prod]
 }
 
-pub fn add_cb<S: PrimeField>(a: &Vec<Vec<S>>, b: &Vec<Vec<S>>) -> Vec<Vec<S>> {
-    let mut res = a.clone();
-    res.append(&mut b.clone());
-    res
+pub fn partial_eval_binary_form<S: PrimeField>(f: &Vec<Vec<S>>, x: &Vec<S>) -> Vec<Vec<S>> {
+    let l = x.len();
+    let mut new_f = vec![];
+    for term in f {
+        let mut new_term = vec![];
+        let mut new_const = term[0];
+        for i in 0..l {
+            let idx = i + 1;
+            if term[idx] == S::one() {
+                new_const *= S::one() - x[i];
+            } else if term[idx] == S::one() + S::one() {
+                new_const *= x[i];
+            }
+        }
+        new_term.push(new_const);
+        new_term.extend_from_slice(&term[l + 1..]);
+        new_f.push(new_term);
+    }
+    new_f
+}
+
+pub fn partial_eval_i_binary_form<S: PrimeField<Repr = [u8; 32]>>(
+    f: &Vec<Vec<S>>,
+    x: &S,
+    i: usize,
+) -> Vec<Vec<S>> {
+    let mut res_f = vec![];
+    for t in f.iter() {
+        let mut new_t = t.clone();
+        let mut constant = t[0];
+        if t[i] == S::one() {
+            constant *= (S::one() - x);
+        } else if t[i] == S::one() + S::one() {
+            constant *= x;
+        }
+        new_t[0] = constant;
+        new_t[i] = S::zero();
+        res_f.push(new_t);
+    }
+    res_f
 }
 
 pub fn chi_w<S: PrimeField>(w: &String) -> Vec<Vec<S>> {
@@ -307,22 +344,40 @@ pub fn mult_poly<S: PrimeField + std::hash::Hash>(
     res
 }
 
-pub fn get_univariate_coeff<S: PrimeField<Repr = [u8; 32]>>(f: &Vec<Vec<S>>, i: usize) -> Vec<S> {
-    let mut coeffs = vec![S::zero()];
-    for t in f {
-        let deg_u256 = fe_to_u256(t[i]);
-        let deg = deg_u256.as_usize();
-        if coeffs.len() - 1 < deg {
-            let mut acc = vec![S::zero(); deg - coeffs.len() + 1];
-            coeffs.append(&mut acc);
+pub fn get_univariate_coeff<S: PrimeField<Repr = [u8; 32]>>(
+    f: &Vec<Vec<S>>,
+    i: usize,
+    is_binary_form: bool,
+) -> Vec<S> {
+    if is_binary_form {
+        let mut coeffs = vec![S::zero(); 2];
+        for t in f {
+            let constant = t[0];
+            if t[i] == S::one() {
+                coeffs[0] += constant;
+                coeffs[1] += minus_one::<S>() * constant;
+            } else if t[i] == S::one() + S::one() {
+                coeffs[1] += constant;
+            }
         }
-        coeffs[deg] += t[0];
+        coeffs
+    } else {
+        let mut coeffs = vec![S::zero()];
+        for t in f {
+            let deg_u256 = fe_to_u256(t[i]);
+            let deg = deg_u256.as_usize();
+            if coeffs.len() - 1 < deg {
+                let mut acc = vec![S::zero(); deg - coeffs.len() + 1];
+                coeffs.append(&mut acc);
+            }
+            coeffs[deg] += t[0];
+        }
+        coeffs.reverse();
+        coeffs
     }
-    coeffs.reverse();
-    coeffs
 }
 
-fn mult_univariate<S: PrimeField<Repr = [u8; 32]>>(p: Vec<S>, q: Vec<S>) -> Vec<S> {
+pub fn mult_univariate<S: PrimeField<Repr = [u8; 32]>>(p: &Vec<S>, q: &Vec<S>) -> Vec<S> {
     let h_deg_p = p.len() - 1;
     let h_deg_q = q.len() - 1;
     let mut p_rev = p.clone();
@@ -344,7 +399,12 @@ fn mult_univariate<S: PrimeField<Repr = [u8; 32]>>(p: Vec<S>, q: Vec<S>) -> Vec<
     res
 }
 
-fn add_univariate<S: PrimeField<Repr = [u8; 32]>>(p: Vec<S>, q: Vec<S>) -> Vec<S> {
+pub fn add_univariate<S: PrimeField<Repr = [u8; 32]>>(p: &Vec<S>, q: &Vec<S>) -> Vec<S> {
+    if p.len() == 0 {
+        return q.clone();
+    } else if q.len() == 0 {
+        return p.clone();
+    }
     let h_deg = std::cmp::max(p.len(), q.len());
     let mut p_rev = p.clone();
     let mut q_rev = q.clone();
@@ -389,10 +449,10 @@ pub fn reduce_multiple_polynomial<S: PrimeField<Repr = [u8; 32]>>(
             let deg = fe_to_u256(*d).as_usize();
             for _ in 0..deg {
                 let term = vec![t[idx].1, t[idx].0];
-                new_poly = mult_univariate(new_poly, term);
+                new_poly = mult_univariate(&new_poly, &term);
             }
         }
-        res = add_univariate(res, new_poly);
+        res = add_univariate(&res, &new_poly);
     }
     res
 }

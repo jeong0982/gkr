@@ -27,27 +27,29 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         if z[i].len() == 0 {
             add_res = add.clone();
         } else {
-            add_res = partial_eval_binary_form(add, &z[i]);
+            add_res = partial_eval_binary_form(&add, &z[i]);
         }
         let mult = circuit.mult(i);
         let mut mult_res = vec![];
         if z[i].len() == 0 {
             mult_res = mult.clone();
         } else {
-            mult_res = partial_eval_binary_form(mult, &z[i]);
+            mult_res = partial_eval_binary_form(&mult, &z[i]);
         }
 
         let w_i_ext_b = input.w(i + 1).clone();
         let w_i_ext_c = modify_poly_from_k(input.w(i + 1), circuit.k(i + 1));
 
         let w_i_ext_add = add_poly(&w_i_ext_b, &w_i_ext_c);
-        let first = mult_poly(&add_res, &w_i_ext_add);
-
         let w_i_ext_mult = mult_poly(&w_i_ext_b, &w_i_ext_c);
-        let second = mult_poly(&mult_res, &w_i_ext_mult);
 
-        let f = add_poly(&first, &second);
-        let (sumcheck_proof, r) = prove_sumcheck(&f, 2 * circuit.k(i + 1));
+        let (sumcheck_proof, r) = prove_sumcheck_opt(
+            &add_res,
+            &mult_res,
+            &w_i_ext_add,
+            &w_i_ext_mult,
+            2 * circuit.k(i + 1),
+        );
         sumcheck_proofs.push(sumcheck_proof.clone());
         sumcheck_r.push(r.clone());
 
@@ -61,15 +63,28 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
 
         q.push(q_i);
 
-        let mut f_modified = f.clone();
         let mut f_modified_uni: Vec<S> = vec![];
+        let mut w_i_add_res = w_i_ext_add.clone();
+        let mut w_i_mult_res = w_i_ext_mult.clone();
+        let mut add_i_res = add_res.clone();
+        let mut mult_i_res = mult_res.clone();
+
         for (j, x) in r.iter().enumerate() {
             if j == r.len() - 1 {
                 f_res.push(eval_univariate(&f_modified_uni, x))
             } else {
-                f_modified = partial_eval_i(&f_modified, x, j + 1);
+                w_i_add_res = partial_eval_i(&w_i_add_res, x, j + 1);
+                w_i_mult_res = partial_eval_i(&w_i_mult_res, x, j + 1);
+                add_i_res = partial_eval_i_binary_form(&add_i_res, x, j + 1);
+                mult_i_res = partial_eval_i_binary_form(&mult_i_res, x, j + 1);
                 if j == r.len() - 2 {
-                    f_modified_uni = get_univariate_coeff(&f_modified, r.len());
+                    let w_i_add_coeffs = get_univariate_coeff(&w_i_add_res,r.len(), false);
+                    let w_i_mult_coeffs = get_univariate_coeff(&w_i_mult_res,r.len(), false);
+                    let add_coeffs = get_univariate_coeff(&add_i_res,r.len(), true);
+                    let mult_coeffs = get_univariate_coeff(&mult_i_res,r.len(), true);
+                    let add = mult_univariate(&w_i_add_coeffs, &add_coeffs);
+                    let mult = mult_univariate(&w_i_mult_coeffs, &mult_coeffs);
+                    f_modified_uni = add_univariate(&add, &mult);
                 }
             }
         }

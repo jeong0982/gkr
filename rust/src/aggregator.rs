@@ -148,10 +148,20 @@ fn get_meta(proof: &Proof<Fr>) -> Meta {
     let k_input = proof.k[proof.depth - 1];
     meta.push(k_input);
 
-    // meta[8], meta[9] = largest # of terms among {add_i, mult_i}
+    // meta[8] = largest # of terms among add_i
     let l_add = proof.add.iter().map(|p| p.len()).max().unwrap();
-    let l_mult = proof.mult.iter().map(|p| p.len()).max().unwrap();
     meta.push(l_add);
+
+    // meta[9] = largest # of variables of add_i and mult_i
+    let l_var = proof.add
+    .iter()
+    .map(|p| p.iter().map(|terms| terms.len()).max().unwrap())
+    .max()
+    .unwrap();
+    meta.push(l_var);
+
+    // meta[10] = largest # of terms among add_i
+    let l_mult = proof.mult.iter().map(|p| p.len()).max().unwrap();
     meta.push(l_mult);
 
     meta.append(&mut proof.k.clone());
@@ -218,15 +228,15 @@ fn modify_proof_for_circom(proof: Proof<Fr>, meta_value: &Meta) -> Proof<Fr> {
         let mut new_p = vec![];
         for terms in p.iter() {
             let mut new_terms = terms.clone();
-            if terms.len() < 3 * meta[1] + 1 {
-                let mut z = zeros(3 * meta[1] + 1 - terms.len());
+            if terms.len() < meta[9] {
+                let mut z = zeros(meta[9] - terms.len());
                 new_terms.append(&mut z);
             }
             new_p.push(new_terms);
         }
         if p.len() < meta[8] {
             for _ in 0..(meta[8] - p.len()) {
-                let new_terms = zeros(3 * meta[1] + 1);
+                let new_terms = zeros(meta[9]);
                 new_p.push(new_terms);
             }
         }
@@ -238,15 +248,15 @@ fn modify_proof_for_circom(proof: Proof<Fr>, meta_value: &Meta) -> Proof<Fr> {
         let mut new_p = vec![];
         for terms in p.iter() {
             let mut new_terms = terms.clone();
-            if terms.len() < 3 * meta[1] + 1 {
-                let mut z = zeros(3 * meta[1] + 1 - terms.len());
+            if terms.len() < meta[9] {
+                let mut z = zeros(meta[9] - terms.len());
                 new_terms.append(&mut z);
             }
             new_p.push(new_terms);
         }
-        if p.len() < meta[9] {
-            for _ in 0..(meta[9] - p.len()) {
-                let new_terms = zeros(3 * meta[1] + 1);
+        if p.len() < meta[10] {
+            for _ in 0..(meta[10] - p.len()) {
+                let new_terms = zeros(meta[9]);
                 new_p.push(new_terms);
             }
         }
@@ -281,8 +291,8 @@ fn modify_circom_file(path: String, meta_value: &Meta) -> String {
     signal input z[d][largest_k];
     signal input r[d - 1];
     signal input inputFunc[{{meta_6}}][{{meta_7}} + 1];
-    signal input add[d - 1][{{meta_8}}][3 * largest_k + 1];
-    signal input mult[d - 1][{{meta_9}}][3 * largest_k + 1];
+    signal input add[d - 1][{{meta_8}}][{{meta_9}}];
+    signal input mult[d - 1][{{meta_10}}][{{meta_9}}];
     signal output isValid;
     component verifier = VerifyGKR({{ meta }});
     var a = {{ meta_0 }} - 1;
@@ -326,14 +336,14 @@ fn modify_circom_file(path: String, meta_value: &Meta) -> String {
     }
     for (var i = 0; i < a; i++) {
         for (var j = 0; j < {{ meta_8 }}; j++) {
-            for (var k = 0; k < 3 * {{ meta_1 }} + 1; k++) {
+            for (var k = 0; k < {{ meta_9 }}; k++) {
                 verifier.add[i][j][k] <== add[i][j][k];
             }
         }
     }
     for (var i = 0; i < a; i++) {
-        for (var j = 0; j < {{ meta_9 }}; j++) {
-            for (var k = 0; k < 3 * {{ meta_1 }} + 1; k++) {
+        for (var j = 0; j < {{ meta_10 }}; j++) {
+            for (var k = 0; k < {{ meta_9 }}; k++) {
                 verifier.mult[i][j][k] <== mult[i][j][k];
             }
         }

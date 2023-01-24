@@ -473,46 +473,51 @@ pub fn convert_r1cs_wtns_gkr(
     println!("Layer depth: {:?}", layers.len());
 
     let mut gkr_layers = vec![];
-    for i in 0..(layers.len() - 1) {
+    for i in 0..layers.len() {
         println!("{:?} layer starts", i);
         let k_i = get_k(layers[i].node_types.len());
-        let k_next = get_k(layers[i + 1].node_types.len());
-        let v = k_i + 2 * k_next;
+        let mut v = 0;
+        let mut k_next = 0;
+        if i == layers.len() - 1 {
+            k_next = input_k;
+        } else {
+            k_next = get_k(layers[i + 1].node_types.len());
+        }
+        v = k_i + 2 * k_next;
 
         let mut mult_i = get_empty::<Fr>(v);
         let mut add_i = get_empty::<Fr>(v);
 
-        let mut add_m = false;
-        let mut mult_m = false;
-
         let binary_inputs: Vec<String> = generate_binary_string(v);
-        add_i = binary_inputs.par_iter()
-        .filter(|b| {
-            let curr = usize::from_str_radix(&b[0..k_i], 2).unwrap_or(0);
-            let next_left = usize::from_str_radix(&b[k_i..k_i + k_next], 2).unwrap();
-            let next_right = usize::from_str_radix(&b[k_i + k_next..], 2).unwrap();
-            layers[i].operand_index[curr] == (next_left, next_right)
-                && layers[i].node_types[curr] == NodeType::Add
-        })
-        .map(|b| chi_w_for_binary::<Fr>(b))
-        .reduce(|| get_empty::<Fr>(v - 1), |a, b| add_cb(&a, &b));
-
-        mult_i = binary_inputs.par_iter()
-        .filter(|b| {
-            let curr = usize::from_str_radix(&b[0..k_i], 2).unwrap_or(0);
-            let next_left = usize::from_str_radix(&b[k_i..k_i + k_next], 2).unwrap();
-            let next_right = usize::from_str_radix(&b[k_i + k_next..], 2).unwrap();
-            layers[i].operand_index[curr] == (next_left, next_right)
-                && layers[i].node_types[curr] == NodeType::Mult
+        add_i = binary_inputs
+            .par_iter()
+            .filter(|b| {
+                let curr = usize::from_str_radix(&b[0..k_i], 2).unwrap_or(0);
+                let next_left = usize::from_str_radix(&b[k_i..k_i + k_next], 2).unwrap();
+                let next_right = usize::from_str_radix(&b[k_i + k_next..], 2).unwrap();
+                layers[i].operand_index[curr] == (next_left, next_right)
+                    && layers[i].node_types[curr] == NodeType::Add
             })
             .map(|b| chi_w_for_binary::<Fr>(b))
-            .reduce(|| get_empty::<Fr>(v - 1), |a, b| add_cb(&a, &b));
-        
+            .reduce(|| get_empty::<Fr>(v), |a, b| add_poly(&a, &b));
+
+        mult_i = binary_inputs
+            .par_iter()
+            .filter(|b| {
+                let curr = usize::from_str_radix(&b[0..k_i], 2).unwrap_or(0);
+                let next_left = usize::from_str_radix(&b[k_i..k_i + k_next], 2).unwrap();
+                let next_right = usize::from_str_radix(&b[k_i + k_next..], 2).unwrap();
+                layers[i].operand_index[curr] == (next_left, next_right)
+                    && layers[i].node_types[curr] == NodeType::Mult
+            })
+            .map(|b| chi_w_for_binary::<Fr>(b))
+            .reduce(|| get_empty::<Fr>(v), |a, b| add_poly(&a, &b));
+
         if add_i.len() == 0 {
-            add_i = get_empty::<Fr>(v - 1);
+            add_i = get_empty::<Fr>(v);
         }
         if mult_i.len() == 0 {
-            mult_i = get_empty::<Fr>(v - 1);
+            mult_i = get_empty::<Fr>(v);
         }
         gkr_layers.push(Layer::new(k_i, add_i, mult_i));
     }
