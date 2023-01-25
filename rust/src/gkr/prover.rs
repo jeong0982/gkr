@@ -7,6 +7,7 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
     circuit: GKRCircuit<S>,
     input: Input<S>,
 ) -> Proof<S> {
+    println!("Proving starts..");
     let mimc = Mimc7::new(91);
 
     let mut sumcheck_proofs = vec![];
@@ -22,6 +23,7 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
     z.push(z_zero);
 
     for i in 0..circuit.depth() {
+        println!("depth {} proving", i);
         let add = circuit.add(i);
         let mut add_res = vec![];
         if z[i].len() == 0 {
@@ -29,6 +31,7 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         } else {
             add_res = partial_eval_binary_form(&add, &z[i]);
         }
+        println!("depth {} 1", i);
         let mult = circuit.mult(i);
         let mut mult_res = vec![];
         if z[i].len() == 0 {
@@ -36,13 +39,14 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         } else {
             mult_res = partial_eval_binary_form(&mult, &z[i]);
         }
-
+        println!("depth {} 2", i);
         let w_i_ext_b = input.w(i + 1).clone();
         let w_i_ext_c = modify_poly_from_k(input.w(i + 1), circuit.k(i + 1));
 
         let w_i_ext_add = add_poly(&w_i_ext_b, &w_i_ext_c);
         let w_i_ext_mult = mult_poly(&w_i_ext_b, &w_i_ext_c);
-
+        println!("{} {}", w_i_ext_add.len(), w_i_ext_mult.len());
+        println!("depth {} 3", i);
         let (sumcheck_proof, r) = prove_sumcheck_opt(
             &add_res,
             &mult_res,
@@ -78,10 +82,10 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
                 add_i_res = partial_eval_i_binary_form(&add_i_res, x, j + 1);
                 mult_i_res = partial_eval_i_binary_form(&mult_i_res, x, j + 1);
                 if j == r.len() - 2 {
-                    let w_i_add_coeffs = get_univariate_coeff(&w_i_add_res,r.len(), false);
-                    let w_i_mult_coeffs = get_univariate_coeff(&w_i_mult_res,r.len(), false);
-                    let add_coeffs = get_univariate_coeff(&add_i_res,r.len(), true);
-                    let mult_coeffs = get_univariate_coeff(&mult_i_res,r.len(), true);
+                    let w_i_add_coeffs = get_univariate_coeff(&w_i_add_res, r.len(), false);
+                    let w_i_mult_coeffs = get_univariate_coeff(&w_i_mult_res, r.len(), false);
+                    let add_coeffs = get_univariate_coeff(&add_i_res, r.len(), true);
+                    let mult_coeffs = get_univariate_coeff(&mult_i_res, r.len(), true);
                     let add = mult_univariate(&w_i_add_coeffs, &add_coeffs);
                     let mult = mult_univariate(&w_i_mult_coeffs, &mult_coeffs);
                     f_modified_uni = add_univariate(&add, &mult);

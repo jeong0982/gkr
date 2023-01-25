@@ -264,7 +264,6 @@ fn compile(
     for d in 0..(height + 1) {
         let mut layer_operand_idx = vec![];
         let mut node_types = vec![];
-        println!("n leng {:?}", current_nodes.len());
         let k = get_k(current_nodes.len());
         let full_num = 1 << k;
         let diff = full_num - current_nodes.len();
@@ -474,7 +473,6 @@ pub fn convert_r1cs_wtns_gkr(
 
     let mut gkr_layers = vec![];
     for i in 0..layers.len() {
-        println!("{:?} layer starts", i);
         let k_i = get_k(layers[i].node_types.len());
         let mut v = 0;
         let mut k_next = 0;
@@ -485,32 +483,40 @@ pub fn convert_r1cs_wtns_gkr(
         }
         v = k_i + 2 * k_next;
 
-        let mut mult_i = get_empty::<Fr>(v);
-        let mut add_i = get_empty::<Fr>(v);
-
-        let binary_inputs: Vec<String> = generate_binary_string(v);
-        add_i = binary_inputs
+        let mut add_i = layers[i]
+            .node_types
             .par_iter()
-            .filter(|b| {
-                let curr = usize::from_str_radix(&b[0..k_i], 2).unwrap_or(0);
-                let next_left = usize::from_str_radix(&b[k_i..k_i + k_next], 2).unwrap();
-                let next_right = usize::from_str_radix(&b[k_i + k_next..], 2).unwrap();
-                layers[i].operand_index[curr] == (next_left, next_right)
-                    && layers[i].node_types[curr] == NodeType::Add
+            .enumerate()
+            .filter(|(_, node)| **node == NodeType::Add)
+            .map(|(curr, node)| {
+                let mut curr_string = format!("{:0k$b}", curr, k = k_i);
+                if k_i == 0 {
+                    curr_string = String::new();
+                }
+                let operand_index = layers[i].operand_index[curr];
+                let left_string = format!("{:0k$b}", operand_index.0, k = k_next);
+                let right_string = format!("{:0k$b}", operand_index.1, k = k_next);
+                let b = format!("{}{}{}", curr_string, left_string, right_string);
+                chi_w_for_binary::<Fr>(&b)
             })
-            .map(|b| chi_w_for_binary::<Fr>(b))
             .reduce(|| get_empty::<Fr>(v), |a, b| add_poly(&a, &b));
 
-        mult_i = binary_inputs
+        let mut mult_i = layers[i]
+            .node_types
             .par_iter()
-            .filter(|b| {
-                let curr = usize::from_str_radix(&b[0..k_i], 2).unwrap_or(0);
-                let next_left = usize::from_str_radix(&b[k_i..k_i + k_next], 2).unwrap();
-                let next_right = usize::from_str_radix(&b[k_i + k_next..], 2).unwrap();
-                layers[i].operand_index[curr] == (next_left, next_right)
-                    && layers[i].node_types[curr] == NodeType::Mult
+            .enumerate()
+            .filter(|(_, node)| **node == NodeType::Mult)
+            .map(|(curr, node)| {
+                let mut curr_string = format!("{:0k$b}", curr, k = k_i);
+                if k_i == 0 {
+                    curr_string = String::new();
+                }
+                let operand_index = layers[i].operand_index[curr];
+                let left_string = format!("{:0k$b}", operand_index.0, k = k_next);
+                let right_string = format!("{:0k$b}", operand_index.1, k = k_next);
+                let b = format!("{}{}{}", curr_string, left_string, right_string);
+                chi_w_for_binary::<Fr>(&b)
             })
-            .map(|b| chi_w_for_binary::<Fr>(b))
             .reduce(|| get_empty::<Fr>(v), |a, b| add_poly(&a, &b));
 
         if add_i.len() == 0 {
@@ -521,6 +527,7 @@ pub fn convert_r1cs_wtns_gkr(
         }
         gkr_layers.push(Layer::new(k_i, add_i, mult_i));
     }
+    println!("Convert done.");
     (GKRCircuit::new(gkr_layers, input_k), input_gkr, output_gkr)
 }
 

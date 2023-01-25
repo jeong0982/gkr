@@ -37,7 +37,7 @@ fn mult_multi_poly<S: PrimeField>(l: &Vec<S>, r: &Vec<S>) -> Vec<S> {
 }
 
 /// For add_i and mult_i, they have only two types for term, x or 1 - x.
-/// Represent x as 1, (1 - x) as 2.
+/// Represent (1 - x) as 1, x as 2.
 pub fn chi_w_for_binary<S: PrimeField>(w: &String) -> Vec<Vec<S>> {
     let l = w.len();
     let mut prod = constant_one::<S>(l);
@@ -238,7 +238,7 @@ pub fn modify_poly_from_k<S: PrimeField>(f: Vec<Vec<S>>, k: usize) -> Vec<Vec<S>
     res_f
 }
 
-fn extend_length<S: PrimeField>(f: &Vec<S>, l: usize) -> Vec<S> {
+pub fn extend_length<S: PrimeField>(f: &Vec<S>, l: usize) -> Vec<S> {
     if f.len() == l {
         f.clone()
     } else {
@@ -360,6 +360,7 @@ pub fn get_univariate_coeff<S: PrimeField<Repr = [u8; 32]>>(
                 coeffs[1] += constant;
             }
         }
+        coeffs.reverse();
         coeffs
     } else {
         let mut coeffs = vec![S::zero()];

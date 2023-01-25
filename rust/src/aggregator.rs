@@ -153,11 +153,12 @@ fn get_meta(proof: &Proof<Fr>) -> Meta {
     meta.push(l_add);
 
     // meta[9] = largest # of variables of add_i and mult_i
-    let l_var = proof.add
-    .iter()
-    .map(|p| p.iter().map(|terms| terms.len()).max().unwrap())
-    .max()
-    .unwrap();
+    let l_var = proof
+        .add
+        .iter()
+        .map(|p| p.iter().map(|terms| terms.len()).max().unwrap())
+        .max()
+        .unwrap();
     meta.push(l_var);
 
     // meta[10] = largest # of terms among add_i
