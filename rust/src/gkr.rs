@@ -39,11 +39,17 @@ pub struct Layer<S: PrimeField> {
     pub k: usize,
     pub add: Vec<Vec<S>>,
     pub mult: Vec<Vec<S>>,
+    pub wire: (Vec<Vec<S>>, Vec<Vec<S>>),
 }
 
 impl<S: PrimeField> Layer<S> {
-    pub fn new(k: usize, add: Vec<Vec<S>>, mult: Vec<Vec<S>>) -> Self {
-        Layer { k, add, mult }
+    pub fn new(
+        k: usize,
+        add: Vec<Vec<S>>,
+        mult: Vec<Vec<S>>,
+        wire: (Vec<Vec<S>>, Vec<Vec<S>>),
+    ) -> Self {
+        Layer { k, add, mult, wire }
     }
 }
 
@@ -65,8 +71,16 @@ impl<S: PrimeField> GKRCircuit<S> {
         self.layer[i].add.clone()
     }
 
+    pub fn add_wire(&self, i: usize) -> Vec<Vec<S>> {
+        self.layer[i].wire.0.clone()
+    }
+
     pub fn mult(&self, i: usize) -> Vec<Vec<S>> {
         self.layer[i].mult.clone()
+    }
+
+    pub fn mult_wire(&self, i: usize) -> Vec<Vec<S>> {
+        self.layer[i].wire.1.clone()
     }
 
     pub fn k(&self, i: usize) -> usize {

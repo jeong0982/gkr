@@ -23,7 +23,6 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
     z.push(z_zero);
 
     for i in 0..circuit.depth() {
-        println!("depth {} proving", i);
         let add = circuit.add(i);
         let mut add_res = vec![];
         if z[i].len() == 0 {
@@ -31,7 +30,6 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         } else {
             add_res = partial_eval_binary_form(&add, &z[i]);
         }
-        println!("depth {} 1", i);
         let mult = circuit.mult(i);
         let mut mult_res = vec![];
         if z[i].len() == 0 {
@@ -39,19 +37,20 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         } else {
             mult_res = partial_eval_binary_form(&mult, &z[i]);
         }
-        println!("depth {} 2", i);
-        let w_i_ext_b = input.w(i + 1).clone();
+        let w_i = input.w(i + 1).clone();
+        let mut w_i_ext_b = vec![];
+        for t in w_i.iter() {
+            w_i_ext_b.push(extend_length(t, 2 * circuit.k(i + 1) + 1));
+        }
         let w_i_ext_c = modify_poly_from_k(input.w(i + 1), circuit.k(i + 1));
 
-        let w_i_ext_add = add_poly(&w_i_ext_b, &w_i_ext_c);
-        let w_i_ext_mult = mult_poly(&w_i_ext_b, &w_i_ext_c);
-        println!("{} {}", w_i_ext_add.len(), w_i_ext_mult.len());
-        println!("depth {} 3", i);
         let (sumcheck_proof, r) = prove_sumcheck_opt(
+            &circuit.add_wire(i),
+            &circuit.mult_wire(i),
             &add_res,
             &mult_res,
-            &w_i_ext_add,
-            &w_i_ext_mult,
+            &w_i_ext_b,
+            &w_i_ext_c,
             2 * circuit.k(i + 1),
         );
         sumcheck_proofs.push(sumcheck_proof.clone());
@@ -68,8 +67,8 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         q.push(q_i);
 
         let mut f_modified_uni: Vec<S> = vec![];
-        let mut w_i_add_res = w_i_ext_add.clone();
-        let mut w_i_mult_res = w_i_ext_mult.clone();
+        let mut w_i_b_res = w_i_ext_b.clone();
+        let mut w_i_c_res = w_i_ext_c.clone();
         let mut add_i_res = add_res.clone();
         let mut mult_i_res = mult_res.clone();
 
@@ -77,17 +76,19 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
             if j == r.len() - 1 {
                 f_res.push(eval_univariate(&f_modified_uni, x))
             } else {
-                w_i_add_res = partial_eval_i(&w_i_add_res, x, j + 1);
-                w_i_mult_res = partial_eval_i(&w_i_mult_res, x, j + 1);
+                w_i_b_res = partial_eval_i(&w_i_b_res, x, j + 1);
+                w_i_c_res = partial_eval_i(&w_i_c_res, x, j + 1);
                 add_i_res = partial_eval_i_binary_form(&add_i_res, x, j + 1);
                 mult_i_res = partial_eval_i_binary_form(&mult_i_res, x, j + 1);
                 if j == r.len() - 2 {
-                    let w_i_add_coeffs = get_univariate_coeff(&w_i_add_res, r.len(), false);
-                    let w_i_mult_coeffs = get_univariate_coeff(&w_i_mult_res, r.len(), false);
+                    let w_i_b_coeffs = get_univariate_coeff(&w_i_b_res, r.len(), false);
+                    let w_i_c_coeffs = get_univariate_coeff(&w_i_c_res, r.len(), false);
                     let add_coeffs = get_univariate_coeff(&add_i_res, r.len(), true);
                     let mult_coeffs = get_univariate_coeff(&mult_i_res, r.len(), true);
-                    let add = mult_univariate(&w_i_add_coeffs, &add_coeffs);
-                    let mult = mult_univariate(&w_i_mult_coeffs, &mult_coeffs);
+                    let b_c_add = add_univariate(&w_i_b_coeffs, &w_i_c_coeffs);
+                    let b_c_mult = mult_univariate(&w_i_b_coeffs, &w_i_c_coeffs);
+                    let add = mult_univariate(&b_c_add, &add_coeffs);
+                    let mult = mult_univariate(&b_c_mult, &mult_coeffs);
                     f_modified_uni = add_univariate(&add, &mult);
                 }
             }

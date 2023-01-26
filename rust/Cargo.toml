@@ -29,3 +29,6 @@ tera = "1"
 
 # concurrency
 rayon = "1.6"
+
+# utility
+itertools = "0.10"

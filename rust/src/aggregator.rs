@@ -294,7 +294,6 @@ fn modify_circom_file(path: String, meta_value: &Meta) -> String {
     signal input inputFunc[{{meta_6}}][{{meta_7}} + 1];
     signal input add[d - 1][{{meta_8}}][{{meta_9}}];
     signal input mult[d - 1][{{meta_10}}][{{meta_9}}];
-    signal output isValid;
     component verifier = VerifyGKR({{ meta }});
     var a = {{ meta_0 }} - 1;
     for (var i = 0; i < a; i++) {

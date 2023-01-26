@@ -456,6 +456,23 @@ pub fn convert_r1cs_wtns_gkr(
     wtns: WtnsFile<32>,
     sym: String,
 ) -> (GKRCircuit<Fr>, Input<Fr>, Output<Fr>) {
+    fn append_binary_set(a: &Vec<Vec<Fr>>, b: &Vec<Vec<Fr>>) -> Vec<Vec<Fr>> {
+        let mut res = a.clone();
+        assert!(b.len() == 1);
+        res.push(b[0].clone());
+        res
+    }
+    fn convert_binary_to_vec(b: &String) -> Vec<Fr> {
+        let mut res = vec![];
+        for c in b.chars() {
+            if c == '0' {
+                res.push(Fr::zero());
+            } else {
+                res.push(Fr::one());
+            }
+        }
+        res
+    }
     let circuit_info = compile(convert_constraints_to_nodes(&r1cs));
     println!("r1cs is converted to GKR intermediate layers");
 
@@ -483,7 +500,7 @@ pub fn convert_r1cs_wtns_gkr(
         }
         v = k_i + 2 * k_next;
 
-        let mut add_i = layers[i]
+        let mut add_bin_strings: Vec<String> = layers[i]
             .node_types
             .par_iter()
             .enumerate()
@@ -496,12 +513,21 @@ pub fn convert_r1cs_wtns_gkr(
                 let operand_index = layers[i].operand_index[curr];
                 let left_string = format!("{:0k$b}", operand_index.0, k = k_next);
                 let right_string = format!("{:0k$b}", operand_index.1, k = k_next);
-                let b = format!("{}{}{}", curr_string, left_string, right_string);
-                chi_w_for_binary::<Fr>(&b)
+                format!("{}{}{}", curr_string, left_string, right_string)
             })
+            .collect();
+
+        let mut add_bin: Vec<Vec<Fr>> = add_bin_strings
+            .par_iter()
+            .map(|s| convert_binary_to_vec(s))
+            .collect();
+
+        let mut add_i = add_bin_strings
+            .par_iter()
+            .map(|s| chi_w_for_binary::<Fr>(s))
             .reduce(|| get_empty::<Fr>(v), |a, b| add_poly(&a, &b));
 
-        let mut mult_i = layers[i]
+        let mut mult_bin_strings: Vec<String> = layers[i]
             .node_types
             .par_iter()
             .enumerate()
@@ -514,9 +540,18 @@ pub fn convert_r1cs_wtns_gkr(
                 let operand_index = layers[i].operand_index[curr];
                 let left_string = format!("{:0k$b}", operand_index.0, k = k_next);
                 let right_string = format!("{:0k$b}", operand_index.1, k = k_next);
-                let b = format!("{}{}{}", curr_string, left_string, right_string);
-                chi_w_for_binary::<Fr>(&b)
+                format!("{}{}{}", curr_string, left_string, right_string)
             })
+            .collect();
+
+        let mut mult_bin: Vec<Vec<Fr>> = mult_bin_strings
+            .par_iter()
+            .map(|s| convert_binary_to_vec(s))
+            .collect();
+
+        let mut mult_i = mult_bin_strings
+            .par_iter()
+            .map(|s| chi_w_for_binary::<Fr>(s))
             .reduce(|| get_empty::<Fr>(v), |a, b| add_poly(&a, &b));
 
         if add_i.len() == 0 {
@@ -525,7 +560,8 @@ pub fn convert_r1cs_wtns_gkr(
         if mult_i.len() == 0 {
             mult_i = get_empty::<Fr>(v);
         }
-        gkr_layers.push(Layer::new(k_i, add_i, mult_i));
+        let wire = (add_bin, mult_bin);
+        gkr_layers.push(Layer::new(k_i, add_i, mult_i, wire));
     }
     println!("Convert done.");
     (GKRCircuit::new(gkr_layers, input_k), input_gkr, output_gkr)
