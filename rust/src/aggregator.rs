@@ -3,7 +3,7 @@ use std::{env::current_dir, fs::File, io::Read, path::PathBuf, process::Command}
 use crate::{
     convert::{convert_r1cs_wtns_gkr, Output},
     file_utils::{execute_circom, get_name, stringify_fr, write_aggregated_input, write_output},
-    gkr::{poly::eval_univariate, prover, Proof},
+    gkr::{prover, Proof},
 };
 use halo2curves::bn256::Fr;
 use r1cs_file::*;
@@ -488,9 +488,9 @@ mod tests {
     fn test_proving() {
         let circuit_path = String::from("./t.circom");
         let mut input_paths = vec![];
-        input_paths.push(String::from("./input1.json"));
-        input_paths.push(String::from("./input2.json"));
-        input_paths.push(String::from("./input3.json"));
+        input_paths.push(String::from("./example/input1.json"));
+        input_paths.push(String::from("./example/input2.json"));
+        input_paths.push(String::from("./example/input3.json"));
         prove_all(circuit_path, input_paths);
     }
 
@@ -498,7 +498,7 @@ mod tests {
     fn test_single_proof() {
         let circuit_path = String::from("./t.circom");
         let mut input_paths = vec![];
-        input_paths.push(String::from("./input1.json"));
+        input_paths.push(String::from("./example/input1.json"));
         prove_all(circuit_path, input_paths);
     }
 }

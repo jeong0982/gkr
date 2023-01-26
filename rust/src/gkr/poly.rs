@@ -84,7 +84,7 @@ pub fn partial_eval_i_binary_form<S: PrimeField<Repr = [u8; 32]>>(
         let mut new_t = t.clone();
         let mut constant = t[0];
         if t[i] == S::one() {
-            constant *= (S::one() - x);
+            constant *= S::one() - x;
         } else if t[i] == S::one() + S::one() {
             constant *= x;
         }

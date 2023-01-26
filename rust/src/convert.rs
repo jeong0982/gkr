@@ -1,10 +1,7 @@
 use r1cs_file::{Constraint, FieldElement, R1csFile};
 use wtns_file::*;
 
-use crate::{
-    file_utils::stringify_fr,
-    gkr::{poly::*, GKRCircuit, Input, Layer},
-};
+use crate::gkr::{poly::*, GKRCircuit, Input, Layer};
 use halo2curves::bn256::Fr;
 use halo2curves::group::ff::PrimeField;
 use rayon::prelude::*;
