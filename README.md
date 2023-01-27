@@ -1,5 +1,7 @@
+### README will be fixed.
 # GKR protocol
-General GKR prover - arithmetic circuit version
+General GKR prover - arithmetic circuit version\
+**This is POC of proof aggregation using GKR. It is too slow for now.**
 
 ## Getting started
 Proof aggregation implemented in Rust is in development. To make GKR proof, use `./python/`.  
