@@ -42,7 +42,7 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         for t in w_i.iter() {
             w_i_ext_b.push(extend_length(t, 2 * circuit.k(i + 1) + 1));
         }
-        let w_i_ext_c = modify_poly_from_k(input.w(i + 1), circuit.k(i + 1));
+        let w_i_ext_c = modify_poly_from_k(&input.w(i + 1), circuit.k(i + 1));
 
         let (sumcheck_proof, r) = prove_sumcheck_opt(
             &circuit.add_wire(i),
@@ -62,37 +62,27 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         c_star.extend_from_slice(&r[circuit.k(i + 1)..]);
 
         let next_w = input.w(i + 1);
-        let q_i = reduce_multiple_polynomial(&b_star, &c_star, next_w);
+        let q_i = reduce_multiple_polynomial(&b_star, &c_star, &next_w);
 
         q.push(q_i);
 
-        let mut f_modified_uni: Vec<S> = vec![];
-        let mut w_i_b_res = w_i_ext_b.clone();
-        let mut w_i_c_res = w_i_ext_c.clone();
-        let mut add_i_res = add_res.clone();
-        let mut mult_i_res = mult_res.clone();
+        let r_sub = &r[0..r.len() - 1].to_vec();
+        let w_i_b_res = partial_eval_from(&w_i_ext_b, r_sub, 1);
+        let w_i_c_res = partial_eval_from(&w_i_ext_c, r_sub, 1);
+        let add_i_res = partial_eval_from_binary_form(&add_res, r_sub, 1);
+        let mult_i_res = partial_eval_from_binary_form(&mult_res, r_sub, 1);
 
-        for (j, x) in r.iter().enumerate() {
-            if j == r.len() - 1 {
-                f_res.push(eval_univariate(&f_modified_uni, x))
-            } else {
-                w_i_b_res = partial_eval_i(&w_i_b_res, x, j + 1);
-                w_i_c_res = partial_eval_i(&w_i_c_res, x, j + 1);
-                add_i_res = partial_eval_i_binary_form(&add_i_res, x, j + 1);
-                mult_i_res = partial_eval_i_binary_form(&mult_i_res, x, j + 1);
-                if j == r.len() - 2 {
-                    let w_i_b_coeffs = get_univariate_coeff(&w_i_b_res, r.len(), false);
-                    let w_i_c_coeffs = get_univariate_coeff(&w_i_c_res, r.len(), false);
-                    let add_coeffs = get_univariate_coeff(&add_i_res, r.len(), true);
-                    let mult_coeffs = get_univariate_coeff(&mult_i_res, r.len(), true);
-                    let b_c_add = add_univariate(&w_i_b_coeffs, &w_i_c_coeffs);
-                    let b_c_mult = mult_univariate(&w_i_b_coeffs, &w_i_c_coeffs);
-                    let add = mult_univariate(&b_c_add, &add_coeffs);
-                    let mult = mult_univariate(&b_c_mult, &mult_coeffs);
-                    f_modified_uni = add_univariate(&add, &mult);
-                }
-            }
-        }
+        let w_i_b_coeffs = get_univariate_coeff(&w_i_b_res, r.len(), false);
+        let w_i_c_coeffs = get_univariate_coeff(&w_i_c_res, r.len(), false);
+        let add_coeffs = get_univariate_coeff(&add_i_res, r.len(), true);
+        let mult_coeffs = get_univariate_coeff(&mult_i_res, r.len(), true);
+        let b_c_add = add_univariate(&w_i_b_coeffs, &w_i_c_coeffs);
+        let b_c_mult = mult_univariate(&w_i_b_coeffs, &w_i_c_coeffs);
+        let add = mult_univariate(&b_c_add, &add_coeffs);
+        let mult = mult_univariate(&b_c_mult, &mult_coeffs);
+        let f_modified_uni = add_univariate(&add, &mult);
+
+        f_res.push(eval_univariate(&f_modified_uni, &r[r.len() - 1]));
 
         let mimc_r_star = sumcheck_proof[sumcheck_proof.len() - 1]
             .iter()

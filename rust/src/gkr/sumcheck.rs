@@ -51,8 +51,8 @@ pub fn prove_sumcheck_opt<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         .par_iter()
         .map(|assignment| {
             let mut add_1_sub = add_i.clone();
-            let f2_1_sub = partial_eval_from(f2.clone(), assignment, 2);
-            let f1_1_sub = partial_eval_from(f1.clone(), assignment, 2);
+            let f2_1_sub = partial_eval_from(f2, assignment, 2);
+            let f1_1_sub = partial_eval_from(f1, assignment, 2);
             let add_1_sub = partial_eval_from_binary_form(&add_i.clone(), assignment, 2);
 
             let f1_1_coeffs = get_univariate_coeff(&f1_1_sub, 1, false);
@@ -66,8 +66,8 @@ pub fn prove_sumcheck_opt<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
     let g_1_mult = mult_assignments
         .par_iter()
         .map(|assignment| {
-            let f2_1_sub = partial_eval_from(f2.clone(), assignment, 2);
-            let f1_1_sub = partial_eval_from(f1.clone(), assignment, 2);
+            let f2_1_sub = partial_eval_from(f2, assignment, 2);
+            let f1_1_sub = partial_eval_from(f1, assignment, 2);
             let mult_1_sub = partial_eval_from_binary_form(&mult_i.clone(), assignment, 2);
 
             let f1_1_coeffs = get_univariate_coeff(&f1_1_sub, 1, false);
@@ -98,8 +98,8 @@ pub fn prove_sumcheck_opt<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         let g_j_add = add_assignments
         .par_iter()
         .map(|assignment| {
-            let f1_j_sub = partial_eval_from(f1_j.clone(), assignment, j + 2);
-            let f2_j_sub = partial_eval_from(f2_j.clone(), assignment, j + 2);
+            let f1_j_sub = partial_eval_from(&f1_j, assignment, j + 2);
+            let f2_j_sub = partial_eval_from(&f2_j, assignment, j + 2);
             let add_j_sub = partial_eval_from_binary_form(&add_j.clone(), assignment, j + 2);
 
             let f1_j_coeffs = get_univariate_coeff(&f1_j_sub, j + 1, false);
@@ -112,8 +112,8 @@ pub fn prove_sumcheck_opt<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         let g_j_mult = mult_assignments
         .par_iter()
         .map(|assignment| {
-            let f1_j_sub = partial_eval_from(f1_j.clone(), assignment, j + 2);
-            let f2_j_sub = partial_eval_from(f2_j.clone(), assignment, j + 2);
+            let f1_j_sub = partial_eval_from(&f1_j, assignment, j + 2);
+            let f2_j_sub = partial_eval_from(&f2_j, assignment, j + 2);
             let mult_j_sub = partial_eval_from_binary_form(&mult_j.clone(), assignment, j + 2);
 
             let f1_j_coeffs = get_univariate_coeff(&f1_j_sub, j + 1, false);
@@ -134,8 +134,8 @@ pub fn prove_sumcheck_opt<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
     let mut f2_v = f2.clone();
     let mut add_v = add_i.clone();
     let mut mult_v = mult_i.clone();
-    f1_v = partial_eval(f1_v, &r);
-    f2_v = partial_eval(f2_v, &r);
+    f1_v = partial_eval(&f1_v, &r);
+    f2_v = partial_eval(&f2_v, &r);
     add_v = partial_eval_binary_form(&add_v, &r);
     mult_v = partial_eval_binary_form(&mult_v, &r);
 
@@ -204,7 +204,7 @@ pub fn prove_sumcheck<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         let r_n = mimc.multi_hash(mimc_gj_coeffs, &Fr::from(0));
         r.push(convert_fr_to_s(r_n));
     }
-    let g_v = partial_eval(g.clone(), &r);
+    let g_v = partial_eval(&g, &r);
     let g_v_coeffs = get_univariate_coeff(&g_v, 1, false);
     proof.push(g_v_coeffs.clone());
     let mimc_gv_coeffs = g_v_coeffs.iter().map(|s| convert_s_to_fr(s)).collect();

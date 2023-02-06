@@ -23,19 +23,6 @@ fn constant_one<S: PrimeField>(l: usize) -> Vec<S> {
     vec
 }
 
-fn mult_multi_poly<S: PrimeField>(l: &Vec<S>, r: &Vec<S>) -> Vec<S> {
-    let length = l.len();
-    let mut res = vec![];
-    for i in 0..length {
-        if i == 0 {
-            res.push(l[i] * r[i]);
-        } else {
-            res.push(l[i] + r[i])
-        };
-    }
-    res
-}
-
 /// For add_i and mult_i, they have only two types for term, x or 1 - x.
 /// Represent (1 - x) as 1, x as 2.
 pub fn chi_w_for_binary<S: PrimeField>(w: &String) -> Vec<Vec<S>> {
@@ -119,7 +106,7 @@ pub fn chi_w<S: PrimeField>(w: &String) -> Vec<Vec<S>> {
         let mut new_res = vec![];
         for term in poly.iter() {
             for res_term in res.iter() {
-                new_res.push(mult_multi_poly(term, res_term));
+                new_res.push(mult_mono(term, res_term));
             }
         }
         res = new_res;
@@ -191,10 +178,10 @@ pub fn partial_eval_i<S: PrimeField<Repr = [u8; 32]>>(
     res_f
 }
 
-pub fn partial_eval_from<S: PrimeField<Repr = [u8; 32]>>(f: Vec<Vec<S>>, r: &Vec<S>, idx: usize) -> Vec<Vec<S>> {
+pub fn partial_eval_from<S: PrimeField<Repr = [u8; 32]>>(f: &Vec<Vec<S>>, r: &Vec<S>, idx: usize) -> Vec<Vec<S>> {
     assert!(f[0].len() > r.len());
     if r.len() == 0 {
-        return f;
+        return f.clone();
     }
     let mut res_f = vec![];
     for t in f.iter() {
@@ -241,10 +228,10 @@ pub fn partial_eval_from_binary_form<S: PrimeField<Repr = [u8; 32]>>(
     res_f
 }
 
-pub fn partial_eval<S: PrimeField<Repr = [u8; 32]>>(f: Vec<Vec<S>>, r: &Vec<S>) -> Vec<Vec<S>> {
+pub fn partial_eval<S: PrimeField<Repr = [u8; 32]>>(f: &Vec<Vec<S>>, r: &Vec<S>) -> Vec<Vec<S>> {
     assert!(f[0].len() > r.len());
     if r.len() == 0 {
-        return f;
+        return f.clone();
     }
     let mut res_f = vec![];
     for t in f.iter() {
@@ -275,7 +262,7 @@ pub fn eval_univariate<S: PrimeField<Repr = [u8; 32]>>(f: &Vec<S>, x: &S) -> S {
     res
 }
 
-pub fn modify_poly_from_k<S: PrimeField>(f: Vec<Vec<S>>, k: usize) -> Vec<Vec<S>> {
+pub fn modify_poly_from_k<S: PrimeField>(f: &Vec<Vec<S>>, k: usize) -> Vec<Vec<S>> {
     let mut res_f = vec![];
     for t in f.iter() {
         let mut new_t = vec![t[0]];
@@ -342,7 +329,7 @@ pub fn add_poly<S: PrimeField + std::hash::Hash>(
     res
 }
 
-fn mult_mono<S: PrimeField>(t1: Vec<S>, t2: Vec<S>) -> Vec<S> {
+fn mult_mono<S: PrimeField>(t1: &Vec<S>, t2: &Vec<S>) -> Vec<S> {
     assert_eq!(t1.len(), t2.len());
     let mut res = vec![];
     for i in 0..t1.len() {
@@ -374,7 +361,7 @@ pub fn mult_poly<S: PrimeField + std::hash::Hash>(
 
     for t1 in f1 {
         for t2 in f2 {
-            let t = mult_mono(extend_length(t1, len), extend_length(t2, len));
+            let t = mult_mono(&extend_length(t1, len), &extend_length(t2, len));
             if map.contains_key(&t[1..]) {
                 *map.get_mut(&t[1..]).unwrap() += t[0];
             } else {
@@ -478,7 +465,7 @@ pub fn add_univariate<S: PrimeField<Repr = [u8; 32]>>(p: &Vec<S>, q: &Vec<S>) ->
 pub fn reduce_multiple_polynomial<S: PrimeField<Repr = [u8; 32]>>(
     b: &Vec<S>,
     c: &Vec<S>,
-    w: Vec<Vec<S>>,
+    w: &Vec<Vec<S>>,
 ) -> Vec<S> {
     assert_eq!(b.len(), c.len());
     let mut res = vec![S::zero()];
