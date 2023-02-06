@@ -135,10 +135,11 @@ fn merge_nodes(
 }
 
 fn make_node_from_constraint(constraint: &Constraint<32>) -> IntermediateNode<FieldElement<32>> {
+    let minus_one = FieldElement::from((Fr::zero() - Fr::one()).to_repr());
     let one = FieldElement(Fr::one().to_repr());
-    let a = &constraint.0;
-    let b = &constraint.1;
-    let c = &constraint.2;
+    let mut a = &constraint.0;
+    let mut b = &constraint.1;
+    let mut c = &constraint.2;
 
     let mut node_a = vec![];
     let mut node_b = vec![];
@@ -175,11 +176,13 @@ fn make_node_from_constraint(constraint: &Constraint<32>) -> IntermediateNode<Fi
         }
     }
     for (coeff, x_i) in c {
-        if coeff.clone() == one {
+        if coeff.clone() == minus_one {
             let node = IntermediateNode::new_from_variable(x_i.clone());
             node_c.push(node);
         } else {
-            let left = IntermediateNode::new_from_value(coeff.clone());
+            let coeff_fr = Fr::from_repr(coeff.clone().0).unwrap();
+            let new_coeff = FieldElement((coeff_fr * (Fr::zero() - Fr::one())).to_repr());
+            let left = IntermediateNode::new_from_value(new_coeff.clone());
             let right = IntermediateNode::new_from_variable(x_i.clone());
             let node = IntermediateNode::<FieldElement<32>> {
                 node_type: NodeType::Mult,
@@ -200,22 +203,10 @@ fn make_node_from_constraint(constraint: &Constraint<32>) -> IntermediateNode<Fi
             right: Some(Box::new(root_b)),
         };
 
-        let minus_one_val =
-            Expression::Value(FieldElement::from((Fr::zero() - Fr::one()).to_repr()));
-        let minus_one = IntermediateNode::<FieldElement<32>> {
-            node_type: NodeType::Value(minus_one_val),
-            left: None,
-            right: None,
-        };
-        let minus_c = IntermediateNode {
-            node_type: NodeType::Mult,
-            left: Some(Box::new(root_c)),
-            right: Some(Box::new(minus_one)),
-        };
         IntermediateNode {
             node_type: NodeType::Add,
             left: Some(Box::new(a_times_b)),
-            right: Some(Box::new(minus_c)),
+            right: Some(Box::new(root_c)),
         }
     } else {
         // [] * [] - C = 0
