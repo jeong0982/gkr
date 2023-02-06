@@ -1,6 +1,7 @@
 use ethers_core::types::U256;
 use ff::PrimeField;
 use std::{collections::HashMap, vec};
+use minstant::Instant;
 
 fn fe_to_u256<F>(f: F) -> U256
 where
@@ -186,6 +187,56 @@ pub fn partial_eval_i<S: PrimeField<Repr = [u8; 32]>>(
         let constant = t[0] * x_pow;
         new_t[0] = constant;
         new_t[i] = S::zero();
+        res_f.push(new_t);
+    }
+    res_f
+}
+
+pub fn partial_eval_from<S: PrimeField<Repr = [u8; 32]>>(f: Vec<Vec<S>>, r: &Vec<S>, idx: usize) -> Vec<Vec<S>> {
+    assert!(f[0].len() > r.len());
+    if r.len() == 0 {
+        return f;
+    }
+    let mut res_f = vec![];
+    for t in f.iter() {
+        let mut new_t = t.clone();
+        let mut constant = t[0];
+        for i in 0..r.len() {
+            if t[idx + i] == S::zero() {
+                continue;
+            }
+            let x = fe_to_u256(t[idx + i]).as_usize();
+            for _ in 0..x {
+                constant *= r[i];
+            }
+            new_t[idx + i] = S::zero();
+        }
+        new_t[0] = constant;
+        res_f.push(new_t);
+    }
+    res_f
+}
+
+pub fn partial_eval_from_binary_form<S: PrimeField<Repr = [u8; 32]>>(
+    f: &Vec<Vec<S>>,
+    x: &Vec<S>,
+    idx: usize,
+) -> Vec<Vec<S>> {
+    let mut res_f = vec![];
+    for t in f.iter() {
+        let mut new_t = t.clone();
+        let mut constant = t[0];
+        for i in 0..x.len() {
+            if t[idx + i] == S::one() {
+                constant *= S::one() - x[i];
+                new_t[idx + i] = S::zero();
+            } else if t[idx + i] == S::one() + S::one() {
+                constant *= x[i];
+                new_t[idx + i] = S::zero();
+            }
+        }
+
+        new_t[0] = constant;
         res_f.push(new_t);
     }
     res_f
