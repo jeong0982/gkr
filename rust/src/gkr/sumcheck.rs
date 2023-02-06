@@ -4,7 +4,6 @@ use ff::PrimeField;
 use itertools::Itertools;
 use mimc_rs::{Fr, FrRepr, Mimc7};
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
-use minstant::Instant;
 
 use super::poly::*;
 
@@ -43,7 +42,6 @@ pub fn prove_sumcheck_opt<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
     f2: &Vec<Vec<S>>,
     v: usize,
 ) -> (Vec<Vec<S>>, Vec<S>) {
-    let start = Instant::now();
     let mimc = Mimc7::new(91);
     let mut proof = vec![];
     let mut r = vec![];
@@ -53,7 +51,6 @@ pub fn prove_sumcheck_opt<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         .par_iter()
         .map(|assignment| {
             let mut add_1_sub = add_i.clone();
-            let substart = Instant::now();
             let f2_1_sub = partial_eval_from(f2.clone(), assignment, 2);
             let f1_1_sub = partial_eval_from(f1.clone(), assignment, 2);
             let add_1_sub = partial_eval_from_binary_form(&add_i.clone(), assignment, 2);
