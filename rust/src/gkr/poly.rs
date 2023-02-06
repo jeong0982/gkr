@@ -1,7 +1,6 @@
 use ethers_core::types::U256;
 use ff::PrimeField;
 use std::{collections::HashMap, vec};
-use minstant::Instant;
 
 fn fe_to_u256<F>(f: F) -> U256
 where
