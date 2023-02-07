@@ -4,10 +4,9 @@ use mimc_rs::{Fr, Mimc7};
 use std::vec;
 
 pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
-    circuit: GKRCircuit<S>,
-    input: Input<S>,
+    circuit: &GKRCircuit<S>,
+    input: &Input<S>,
 ) -> Proof<S> {
-    println!("Proving starts..");
     let mimc = Mimc7::new(91);
 
     let mut sumcheck_proofs = vec![];
@@ -23,7 +22,6 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
     z.push(z_zero);
 
     for i in 0..circuit.depth() {
-        println!("{}", i);
         let add = circuit.add(i);
         let mut add_res = vec![];
         if z[i].len() == 0 {
@@ -43,7 +41,14 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         for t in w_i.iter() {
             w_i_ext_b.push(extend_length(t, 2 * circuit.k(i + 1) + 1));
         }
-        let w_i_ext_c = modify_poly_from_k(&input.w(i + 1), circuit.k(i + 1));
+        let mut w_i_ext_c = modify_poly_from_k(&input.w(i + 1), circuit.k(i + 1));
+
+        if w_i_ext_b.len() == 0 {
+            w_i_ext_b = vec![vec![S::zero(); 2 * circuit.k(i + 1) + 1]];
+        }
+        if w_i_ext_c.len() == 0 {
+            w_i_ext_c = vec![vec![S::zero(); 2 * circuit.k(i + 1) + 1]];
+        }
 
         let (sumcheck_proof, r) = prove_sumcheck_opt(
             &circuit.add_wire(i),

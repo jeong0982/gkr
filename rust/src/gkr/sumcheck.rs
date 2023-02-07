@@ -50,7 +50,6 @@ pub fn prove_sumcheck_opt<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
     let g_1_add = add_assignments
         .par_iter()
         .map(|assignment| {
-            let mut add_1_sub = add_i.clone();
             let f2_1_sub = partial_eval_from(f2, assignment, 2);
             let f1_1_sub = partial_eval_from(f1, assignment, 2);
             let add_1_sub = partial_eval_from_binary_form(&add_i.clone(), assignment, 2);

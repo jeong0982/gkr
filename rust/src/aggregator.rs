@@ -106,261 +106,284 @@ fn zeros(l: usize) -> Vec<Fr> {
     vec![Fr::zero(); l]
 }
 
-fn get_meta(proof: &Proof<Fr>) -> Meta {
-    let mut meta = vec![];
-    // meta[0] = depth
-    meta.push(proof.depth);
+fn get_meta(proofs: &Vec<Proof<Fr>>) -> Vec<Meta> {
+    let mut meta_infos = vec![];
+    for proof in proofs {
+        let mut meta = vec![];
+        // meta[0] = depth
+        meta.push(proof.depth);
 
-    // meta[1] = largest k
-    let largest_k = proof
-        .k
-        .iter()
-        .max()
-        .cloned()
-        .expect("Empty proof : k is None");
-    meta.push(largest_k);
+        // meta[1] = largest k
+        let largest_k = proof
+            .k
+            .iter()
+            .max()
+            .cloned()
+            .expect("Empty proof : k is None");
+        meta.push(largest_k);
 
-    // meta[2] = k_i(0)
-    meta.push(proof.k[0]);
+        // meta[2] = k_i(0)
+        meta.push(proof.k[0]);
 
-    // meta[3] = # of terms of D
-    let n_terms_d = proof.d.len();
-    meta.push(n_terms_d);
+        // meta[3] = # of terms of D
+        let n_terms_d = proof.d.len();
+        meta.push(n_terms_d);
 
-    // meta[4] = largest # of terms among sumcheck proofs (highest degree)
-    let largest_deg = proof
-        .sumcheck_proofs
-        .iter()
-        .map(|p| p.iter().map(|terms| terms.len()).max().unwrap())
-        .max()
-        .unwrap();
-    meta.push(largest_deg);
+        // meta[4] = largest # of terms among sumcheck proofs (highest degree)
+        let largest_deg = proof
+            .sumcheck_proofs
+            .iter()
+            .map(|p| p.iter().map(|terms| terms.len()).max().unwrap())
+            .max()
+            .unwrap();
+        meta.push(largest_deg);
 
-    // meta[5] = largest # of terms among q
-    let largest_terms_q = proof.q.iter().map(|p| p.len()).max().unwrap();
-    meta.push(largest_terms_q);
+        // meta[5] = largest # of terms among q
+        let largest_terms_q = proof.q.iter().map(|p| p.len()).max().unwrap();
+        meta.push(largest_terms_q);
 
-    // meta[6] = # of terms in w_d
-    let n_terms_input_func = proof.input_func.len();
-    meta.push(n_terms_input_func);
+        // meta[6] = # of terms in w_d
+        let n_terms_input_func = proof.input_func.len();
+        meta.push(n_terms_input_func);
 
-    // meta[7] = k_i(d - 1)
-    let k_input = proof.k[proof.depth - 1];
-    meta.push(k_input);
+        // meta[7] = k_i(d - 1)
+        let k_input = proof.k[proof.depth - 1];
+        meta.push(k_input);
 
-    // meta[8] = largest # of terms among add_i
-    let l_add = proof.add.iter().map(|p| p.len()).max().unwrap();
-    meta.push(l_add);
+        // meta[8] = largest # of terms among add_i
+        let l_add = proof.add.iter().map(|p| p.len()).max().unwrap();
+        meta.push(l_add);
 
-    // meta[9] = largest # of variables of add_i and mult_i
-    let l_var = proof
-        .add
-        .iter()
-        .map(|p| p.iter().map(|terms| terms.len()).max().unwrap())
-        .max()
-        .unwrap();
-    meta.push(l_var);
+        // meta[9] = largest # of variables of add_i and mult_i
+        let l_var = proof
+            .add
+            .iter()
+            .map(|p| p.iter().map(|terms| terms.len()).max().unwrap())
+            .max()
+            .unwrap();
+        meta.push(l_var);
 
-    // meta[10] = largest # of terms among add_i
-    let l_mult = proof.mult.iter().map(|p| p.len()).max().unwrap();
-    meta.push(l_mult);
+        // meta[10] = largest # of terms among add_i
+        let l_mult = proof.mult.iter().map(|p| p.len()).max().unwrap();
+        meta.push(l_mult);
 
-    meta.append(&mut proof.k.clone());
+        meta.append(&mut proof.k.clone());
 
-    Meta(meta)
+        meta_infos.push(Meta(meta));
+    }
+    meta_infos
 }
 
-fn modify_proof_for_circom(proof: Proof<Fr>, meta_value: &Meta) -> Proof<Fr> {
-    let meta = meta_value.0.clone();
-    let mut sumcheck_proofs = vec![];
-    for p in proof.sumcheck_proofs.iter() {
-        let mut new_p = vec![];
-        for terms in p.iter() {
-            let mut new_terms = terms.clone();
-            if terms.len() < meta[4] {
-                let mut z = zeros(meta[4] - terms.len());
-                z.append(&mut new_terms);
-                new_p.push(z);
+fn modify_proof_for_circom(proof: &Vec<Proof<Fr>>, meta_value: &Vec<Meta>) -> Vec<Proof<Fr>> {
+    let mut proofs = vec![];
+    for (pr, m) in proof.iter().zip(meta_value.iter()) {
+        let meta = m.0.clone();
+        let mut sumcheck_proofs = vec![];
+        for p in pr.sumcheck_proofs.iter() {
+            let mut new_p = vec![];
+            for terms in p.iter() {
+                let mut new_terms = terms.clone();
+                if terms.len() < meta[4] {
+                    let mut z = zeros(meta[4] - terms.len());
+                    z.append(&mut new_terms);
+                    new_p.push(z);
+                } else {
+                    new_p.push(new_terms);
+                }
+            }
+            if p.len() < 2 * meta[1] {
+                for _ in 0..(2 * meta[1] - p.len()) {
+                    let new_terms = zeros(meta[4]);
+                    new_p.push(new_terms);
+                }
+            }
+            sumcheck_proofs.push(new_p);
+        }
+
+        let mut sumcheck_r = vec![];
+        for p in pr.sumcheck_r.iter() {
+            let mut new_p = p.clone();
+            if p.len() < 2 * meta[1] {
+                new_p.extend(zeros(2 * meta[1] - p.len()));
+            }
+            sumcheck_r.push(new_p);
+        }
+
+        let mut q = vec![];
+        for p in pr.q.iter() {
+            let mut new_p = p.clone();
+            if p.len() < meta[5] {
+                let mut z = zeros(meta[5] - p.len());
+                z.append(&mut new_p);
+                q.push(z);
             } else {
+                q.push(new_p);
+            }
+        }
+
+        let mut z = vec![];
+        for p in pr.z.iter() {
+            let mut new_p = p.clone();
+            if p.len() < meta[1] {
+                new_p.extend(zeros(meta[1] - p.len()));
+            }
+            z.push(new_p);
+        }
+
+        let mut add = vec![];
+        for p in pr.add.iter() {
+            let mut new_p = vec![];
+            for terms in p.iter() {
+                let mut new_terms = terms.clone();
+                if terms.len() < meta[9] {
+                    let mut z = zeros(meta[9] - terms.len());
+                    new_terms.append(&mut z);
+                }
                 new_p.push(new_terms);
             }
+            if p.len() < meta[8] {
+                for _ in 0..(meta[8] - p.len()) {
+                    let new_terms = zeros(meta[9]);
+                    new_p.push(new_terms);
+                }
+            }
+            add.push(new_p);
         }
-        if p.len() < 2 * meta[1] {
-            for _ in 0..(2 * meta[1] - p.len()) {
-                let new_terms = zeros(meta[4]);
+
+        let mut mult = vec![];
+        for p in pr.mult.iter() {
+            let mut new_p = vec![];
+            for terms in p.iter() {
+                let mut new_terms = terms.clone();
+                if terms.len() < meta[9] {
+                    let mut z = zeros(meta[9] - terms.len());
+                    new_terms.append(&mut z);
+                }
                 new_p.push(new_terms);
             }
-        }
-        sumcheck_proofs.push(new_p);
-    }
-
-    let mut sumcheck_r = vec![];
-    for p in proof.sumcheck_r.iter() {
-        let mut new_p = p.clone();
-        if p.len() < 2 * meta[1] {
-            new_p.extend(zeros(2 * meta[1] - p.len()));
-        }
-        sumcheck_r.push(new_p);
-    }
-
-    let mut q = vec![];
-    for p in proof.q.iter() {
-        let mut new_p = p.clone();
-        if p.len() < meta[5] {
-            let mut z = zeros(meta[5] - p.len());
-            z.append(&mut new_p);
-            q.push(z);
-        } else {
-            q.push(new_p);
-        }
-    }
-
-    let mut z = vec![];
-    for p in proof.z.iter() {
-        let mut new_p = p.clone();
-        if p.len() < meta[1] {
-            new_p.extend(zeros(meta[1] - p.len()));
-        }
-        z.push(new_p);
-    }
-
-    let mut add = vec![];
-    for p in proof.add.iter() {
-        let mut new_p = vec![];
-        for terms in p.iter() {
-            let mut new_terms = terms.clone();
-            if terms.len() < meta[9] {
-                let mut z = zeros(meta[9] - terms.len());
-                new_terms.append(&mut z);
+            if p.len() < meta[10] {
+                for _ in 0..(meta[10] - p.len()) {
+                    let new_terms = zeros(meta[9]);
+                    new_p.push(new_terms);
+                }
             }
-            new_p.push(new_terms);
+            mult.push(new_p);
         }
-        if p.len() < meta[8] {
-            for _ in 0..(meta[8] - p.len()) {
-                let new_terms = zeros(meta[9]);
-                new_p.push(new_terms);
-            }
-        }
-        add.push(new_p);
+        let new_p = Proof {
+            sumcheck_proofs,
+            sumcheck_r,
+            q,
+            z,
+            f: pr.f.clone(),
+            d: pr.d.clone(),
+            r: pr.r.clone(),
+            add,
+            mult,
+            depth: pr.depth,
+            input_func: pr.input_func.clone(),
+            k: pr.k.clone(),
+        };
+        proofs.push(new_p);
     }
-
-    let mut mult = vec![];
-    for p in proof.mult.iter() {
-        let mut new_p = vec![];
-        for terms in p.iter() {
-            let mut new_terms = terms.clone();
-            if terms.len() < meta[9] {
-                let mut z = zeros(meta[9] - terms.len());
-                new_terms.append(&mut z);
-            }
-            new_p.push(new_terms);
-        }
-        if p.len() < meta[10] {
-            for _ in 0..(meta[10] - p.len()) {
-                let new_terms = zeros(meta[9]);
-                new_p.push(new_terms);
-            }
-        }
-        mult.push(new_p);
-    }
-    Proof {
-        sumcheck_proofs,
-        sumcheck_r,
-        q,
-        z,
-        f: proof.f,
-        d: proof.d,
-        r: proof.r,
-        add,
-        mult,
-        depth: proof.depth,
-        input_func: proof.input_func,
-        k: proof.k,
-    }
+    proofs
 }
 
-fn modify_circom_file(path: String, meta_value: &Meta) -> String {
+fn modify_circom_file(path: String, meta_value: &Vec<Meta>) -> String {
     let mut added = Tera::default();
+    let total = format!("{}", meta_value.len());
+
+    let verifiers = "
+    component verifier[{{total}}];
+    ";
     let source = "
-    var d = {{ meta_0 }};
-    var largest_k = {{ meta_1 }};
-    signal input sumcheckProof[d - 1][2 * largest_k][{{ meta_4 }}];
-    signal input sumcheckr[d - 1][2 * largest_k];
-    signal input q[d - 1][{{meta_5}}];
-    signal input f[d - 1];
-    signal input D[{{meta_3}}][{{meta_2}} + 1];
-    signal input z[d][largest_k];
-    signal input r[d - 1];
-    signal input inputFunc[{{meta_6}}][{{meta_7}} + 1];
-    signal input add[d - 1][{{meta_8}}][{{meta_9}}];
-    signal input mult[d - 1][{{meta_10}}][{{meta_9}}];
-    component verifier = VerifyGKR({{ meta }});
-    var a = {{ meta_0 }} - 1;
-    for (var i = 0; i < a; i++) {
+    var d{{num}} = {{ meta_0 }};
+    var largest_k{{num}} = {{ meta_1 }};
+    signal input sumcheckProof{{num}}[d{{num}} - 1][2 * largest_k{{num}}][{{ meta_4 }}];
+    signal input sumcheckr{{num}}[d{{num}} - 1][2 * largest_k{{num}}];
+    signal input q{{num}}[d{{num}} - 1][{{meta_5}}];
+    signal input f{{num}}[d{{num}} - 1];
+    signal input D{{num}}[{{meta_3}}][{{meta_2}} + 1];
+    signal input z{{num}}[d{{num}}][largest_k{{num}}];
+    signal input r{{num}}[d{{num}} - 1];
+    signal input inputFunc{{num}}[{{meta_6}}][{{meta_7}} + 1];
+    signal input add{{num}}[d{{num}} - 1][{{meta_8}}][{{meta_9}}];
+    signal input mult{{num}}[d{{num}} - 1][{{meta_10}}][{{meta_9}}];
+    verifier[{{num}}] = VerifyGKR({{ meta }});
+    var a{{num}} = {{ meta_0 }} - 1;
+    for (var i = 0; i < a{{num}}; i++) {
         for (var j = 0; j < 2 * {{ meta_1 }}; j++) {
             for (var k = 0; k < {{ meta_4 }}; k++) {
-                verifier.sumcheckProof[i][j][k] <== sumcheckProof[i][j][k];
+                verifier[{{num}}].sumcheckProof[i][j][k] <== sumcheckProof{{num}}[i][j][k];
             }
         }
     }
-    for (var i = 0; i < a; i++) {
+    for (var i = 0; i < a{{num}}; i++) {
         for (var j = 0; j < 2 * {{ meta_1 }}; j++) {
-            verifier.sumcheckr[i][j] <== sumcheckr[i][j];
+            verifier[{{num}}].sumcheckr[i][j] <== sumcheckr{{num}}[i][j];
         }
     }
-    for (var i = 0; i < a; i++) {
+    for (var i = 0; i < a{{num}}; i++) {
         for (var j = 0; j < {{ meta_5 }}; j++) {
-            verifier.q[i][j] <== q[i][j];
+            verifier[{{num}}].q[i][j] <== q{{num}}[i][j];
         }
     }
     for (var i = 0; i < {{ meta_3 }}; i++) {
         for (var j = 0; j < {{ meta_2 }} + 1; j++) {
-            verifier.D[i][j] <== D[i][j];
+            verifier[{{num}}].D[i][j] <== D{{num}}[i][j];
         }
     }
-    for (var i = 0; i < a; i++) {
-        verifier.f[i] <== f[i];
+    for (var i = 0; i < a{{num}}; i++) {
+        verifier[{{num}}].f[i] <== f{{num}}[i];
     }
-    for (var i = 0; i < a + 1; i++) {
+    for (var i = 0; i < a{{num}} + 1; i++) {
         for (var j = 0; j < {{ meta_1 }}; j++) {
-            verifier.z[i][j] <== z[i][j];
+            verifier[{{num}}].z[i][j] <== z{{num}}[i][j];
         }
     }
-    for (var i = 0; i < a; i++) {
-        verifier.r[i] <== r[i];
+    for (var i = 0; i < a{{num}}; i++) {
+        verifier[{{num}}].r[i] <== r{{num}}[i];
     }
     for (var i = 0; i < {{ meta_6 }}; i++) {
         for (var j = 0; j < {{ meta_7 }} + 1; j++) {
-            verifier.inputFunc[i][j] <== inputFunc[i][j];
+            verifier[{{num}}].inputFunc[i][j] <== inputFunc{{num}}[i][j];
         }
     }
-    for (var i = 0; i < a; i++) {
+    for (var i = 0; i < a{{num}}; i++) {
         for (var j = 0; j < {{ meta_8 }}; j++) {
             for (var k = 0; k < {{ meta_9 }}; k++) {
-                verifier.add[i][j][k] <== add[i][j][k];
+                verifier[{{num}}].add[i][j][k] <== add{{num}}[i][j][k];
             }
         }
     }
-    for (var i = 0; i < a; i++) {
+    for (var i = 0; i < a{{num}}; i++) {
         for (var j = 0; j < {{ meta_10 }}; j++) {
             for (var k = 0; k < {{ meta_9 }}; k++) {
-                verifier.mult[i][j][k] <== mult[i][j][k];
+                verifier[{{num}}].mult[i][j][k] <== mult{{num}}[i][j][k];
             }
         }
     }
     ";
     added.add_raw_template("verifier", source).unwrap();
-    let mut ctxt = Context::new();
-    let meta = format!("{:?}", meta_value.0);
+    added.add_raw_template("component", verifiers).unwrap();
+    let mut decl_ctxt = Context::new();
+    decl_ctxt.insert("total", &total);
 
-    ctxt.insert("meta", &meta);
-    for (i, value) in meta_value.0.iter().enumerate() {
-        let value_string = value.to_string();
-        let name = format!("{}_{}", "meta", i.to_string().as_str());
+    let mut v = added.render("component", &decl_ctxt).unwrap();
+    for (i, m) in meta_value.iter().enumerate() {
+        let mut ctxt = Context::new();
+        let meta = format!("{:?}", m.0);
+        ctxt.insert("meta", &meta);
+        let num = format!("{}", i);
+        ctxt.insert("num", &num);
+        for (i, value) in m.0.iter().enumerate() {
+            let value_string = value.to_string();
+            let name = format!("{}_{}", "meta", i.to_string().as_str());
 
-        ctxt.insert(name, &value_string);
+            ctxt.insert(name, &value_string);
+        }
+        let s = added.render("verifier", &ctxt).unwrap();
+        v = format!("{}\n{}", v, s);
     }
-    let s = added.render("verifier", &ctxt).unwrap();
 
     let mut new_circuit = String::new();
     let mut f = File::open(path).expect("original circuit");
@@ -374,7 +397,7 @@ fn modify_circom_file(path: String, meta_value: &Meta) -> String {
                 String::from("include \"../gkr-verifier-circuits/circom/circom/verifier.circom\";");
             new_circuit = format!("{}\n{}\n", line, import);
         } else if line.eq("}") && !is_added {
-            new_circuit = format!("{}\n{}\n}}", new_circuit, s);
+            new_circuit = format!("{}\n{}\n}}", new_circuit, v);
             is_added = true;
         } else {
             new_circuit = format!("{}{}\n", new_circuit, line);
@@ -388,15 +411,18 @@ fn modify_circom_file(path: String, meta_value: &Meta) -> String {
 
 pub fn prove_recursively_circom(
     circuit_path: String,
-    previous_proof: Proof<Fr>,
+    previous_proofs: Vec<Proof<Fr>>,
     input_path: String,
-) -> Proof<Fr> {
-    let meta = get_meta(&previous_proof);
-    let modified_proof = modify_proof_for_circom(previous_proof, &meta);
-    let p = CircomInputProof::new_from_proof(modified_proof);
+) -> Vec<Proof<Fr>> {
+    let meta = get_meta(&previous_proofs);
+    let modified_proof = modify_proof_for_circom(&previous_proofs, &meta);
+    let mut p_vec = vec![];
+    for proof in modified_proof {
+        p_vec.push(CircomInputProof::new_from_proof(proof));
+    }
 
     let input_name = get_name(&input_path);
-    let aggregated_input_path = write_aggregated_input(input_path, p);
+    let aggregated_input_path = write_aggregated_input(input_path, p_vec);
     let aggregated_circuit_path = modify_circom_file(circuit_path.clone(), &meta);
     println!("{} generated", aggregated_circuit_path);
     let circom_result = execute_circom(aggregated_circuit_path.clone(), &aggregated_input_path);
@@ -414,19 +440,27 @@ pub fn prove_recursively_circom(
     let wtns = WtnsFile::<32>::read(File::open(wtns_path).unwrap()).unwrap();
 
     let result = convert_r1cs_wtns_gkr(r1cs, wtns, sym);
-    let proof = prover::prove(result.0, result.1);
+    let mut proofs = vec![];
+    println!("Proving starts..");
+    for (circuit, input) in result.0.iter().zip(result.1.iter()) {
+        let proof = prover::prove(circuit, input);
+        proofs.push(proof);
+    }
 
     let output_name = format!("{}_output.json", &input_name);
     let output_path = format!("{}{}", root_path.clone(), output_name);
     write_output(output_path, result.2);
-    proof
+    proofs
 }
 
-pub fn prove_groth(circuit_path: String, previous_proof: Proof<Fr>, input_path: String) {
-    let meta = get_meta(&previous_proof);
-    let modified_proof = modify_proof_for_circom(previous_proof, &meta);
-    let p = CircomInputProof::new_from_proof(modified_proof);
-    let _aggregated_input_path = write_aggregated_input(input_path, p);
+pub fn prove_groth(circuit_path: String, previous_proofs: Vec<Proof<Fr>>, input_path: String) {
+    let meta = get_meta(&previous_proofs);
+    let modified_proof = modify_proof_for_circom(&previous_proofs, &meta);
+    let mut p_vec = vec![];
+    for proof in modified_proof {
+        p_vec.push(CircomInputProof::new_from_proof(proof));
+    }
+    let _aggregated_input_path = write_aggregated_input(input_path, p_vec);
     let _aggregated_circuit_path = modify_circom_file(circuit_path, &meta);
     println!("Proving by groth..");
 }
@@ -434,7 +468,7 @@ pub fn prove_groth(circuit_path: String, previous_proof: Proof<Fr>, input_path: 
 pub fn prove_all(circuit_path: String, input_paths: Vec<String>) {
     // circom circuit --r1cs --sym --c
     // https://docs.circom.io/getting-started/computing-the-witness/#the-witness-file
-    let mut proof = None;
+    let mut proofs = None;
     for (i, input) in input_paths.iter().enumerate() {
         if i == 0 {
             let circom_result = execute_circom(circuit_path.clone(), input);
@@ -455,18 +489,23 @@ pub fn prove_all(circuit_path: String, input_paths: Vec<String>) {
             let sym = format!("{}{}", root_path.clone(), sym_name);
 
             let result = convert_r1cs_wtns_gkr(r1cs, wtns, sym);
-            proof = Some(prover::prove(result.0, result.1));
-
+            let mut new_proofs = vec![];
+            println!("Proving starts..");
+            for (circuit, input) in result.0.iter().zip(result.1.iter()) {
+                let proof = prover::prove(circuit, input);
+                new_proofs.push(proof);
+            }
+            proofs = Some(new_proofs);
             let output_name = format!("{}_output.json", &input_name);
             let output_path = format!("{}{}", root_path.clone(), output_name);
 
             write_output(output_path, result.2);
         } else if i == input_paths.len() - 1 {
-            prove_groth(circuit_path.clone(), proof.clone().unwrap(), input.clone());
+            prove_groth(circuit_path.clone(), proofs.clone().unwrap(), input.clone());
         } else {
-            proof = Some(prove_recursively_circom(
+            proofs = Some(prove_recursively_circom(
                 circuit_path.clone(),
-                proof.clone().unwrap(),
+                proofs.clone().unwrap(),
                 input.clone(),
             ));
         }
@@ -476,13 +515,6 @@ pub fn prove_all(circuit_path: String, input_paths: Vec<String>) {
 #[cfg(test)]
 mod tests {
     use super::{modify_circom_file, prove_all, Meta};
-
-    #[test]
-    fn test_print() {
-        let meta = Meta(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-        modify_circom_file(String::from("."), &meta);
-        panic!(".");
-    }
 
     #[test]
     fn test_proving() {

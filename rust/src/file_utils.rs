@@ -46,15 +46,17 @@ pub fn write_output(path: String, output: Output<Fr>) {
     fs::write(path, json_string).expect("Unable to write file");
 }
 
-pub fn write_aggregated_input(path: String, input: CircomInputProof) -> String {
+pub fn write_aggregated_input(path: String, inputs: Vec<CircomInputProof>) -> String {
     let file = fs::File::open(path).unwrap();
     let mut input_json: HashMap<String, Value> = from_reader(file).unwrap();
+    for (i, input) in inputs.iter().enumerate() {
+        let proof_string = serde_json::to_string(&input).unwrap();
+        let proof_data: HashMap<String, Value> = from_str(&proof_string).unwrap();
 
-    let proof_string = serde_json::to_string(&input).unwrap();
-    let proof_data: HashMap<String, Value> = from_str(&proof_string).unwrap();
-
-    for (k, v) in proof_data {
-        input_json.insert(k, v);
+        for (k, v) in proof_data {
+            let new_k = format!("{}{}", k, i);
+            input_json.insert(new_k, v);
+        }
     }
     let json_string = serde_json::to_string_pretty(&input_json).unwrap();
 
@@ -109,17 +111,4 @@ pub fn execute_circom(path: String, input_path: &String) -> (String, String) {
         .expect("witness calculator generation failed");
     println!("");
     (String::from(name), root_path)
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::aggregator::CircomInputProof;
-
-    use super::write_aggregated_input;
-
-    #[test]
-    fn test_aggregate_input() {
-        let cp = CircomInputProof::empty();
-        write_aggregated_input(String::from("./input.json"), cp);
-    }
 }
