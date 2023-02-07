@@ -447,8 +447,8 @@ fn convert_constraints_to_nodes(r1cs: &R1csFile<32>) -> Vec<IntermediateNode<Fie
         let cnt_b = count_mult(b);
         let cnt_c = count_mult(c);
 
-        let mult_cnt = cnt_a.0 + cnt_b.0 + cnt_c.0;
-        let m_mult_cnt = cnt_a.1 + cnt_b.1 + cnt_c.1;
+        let mult_cnt = cnt_a.0 + cnt_b.0 + cnt_c.1;
+        let m_mult_cnt = cnt_a.1 + cnt_b.1 + cnt_c.0;
 
         if mult_cnt > m_mult_cnt {
             neg = true;
@@ -457,7 +457,23 @@ fn convert_constraints_to_nodes(r1cs: &R1csFile<32>) -> Vec<IntermediateNode<Fie
             let e = sym_tbl.get(x_i);
             if let Some(lookup_res) = e && lookup_res.0.depth() < DEPTH_LIMIT {
                 let lookup_res_cloned = lookup_res.clone();
+                let coeff_fr = Fr::from_repr(coeff.clone().0).unwrap();
+                let new_coeff = FieldElement((coeff_fr * (Fr::zero() - Fr::one())).to_repr());
                 if coeff.clone() == lookup_res_cloned.2 {
+                    if neg {
+                        let minus_one_node = IntermediateNode::new_from_value(minus_one.clone());
+                        let new_node = IntermediateNode::<FieldElement<32>> {
+                            node_type: NodeType::Mult,
+                            left: Some(Box::new(lookup_res_cloned.0)),
+                            right: Some(Box::new(minus_one_node)),
+                        };
+                        node_a.push(new_node);
+                    } else {
+                        node_a.push(lookup_res_cloned.0);
+                    }
+                    used.push(lookup_res_cloned.1);
+                    continue;
+                } else if new_coeff == lookup_res_cloned.2 && neg {
                     node_a.push(lookup_res_cloned.0);
                     used.push(lookup_res_cloned.1);
                     continue;
@@ -787,6 +803,10 @@ fn calculate_input(
     let mut w = vec![];
     // d = w[0]
     let d_values = w_values[0].clone();
+
+    // check constraint
+    assert_eq!(Fr::zero(), d_values[0]);
+
     let d = get_multi_ext(&d_values, get_k(d_values.len()));
     w.push(d.clone());
     for (i, layer_value) in w_values.iter().enumerate() {

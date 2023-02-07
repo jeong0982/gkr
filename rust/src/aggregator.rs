@@ -523,6 +523,7 @@ mod tests {
         input_paths.push(String::from("./example/input1.json"));
         input_paths.push(String::from("./example/input2.json"));
         input_paths.push(String::from("./example/input3.json"));
+        input_paths.push(String::from("./example/input4.json"));
         prove_all(circuit_path, input_paths);
     }
 
