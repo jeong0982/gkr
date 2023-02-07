@@ -435,8 +435,6 @@ fn convert_constraints_to_nodes(r1cs: &R1csFile<32>) -> Vec<IntermediateNode<Fie
         let mut node_b = vec![];
         let mut node_c = vec![];
 
-        let mut mult_cnt_minus = 0;
-
         let cnt_a = count_mult(a);
         let cnt_b = count_mult(b);
         let cnt_c = count_mult(c);
@@ -454,39 +452,38 @@ fn convert_constraints_to_nodes(r1cs: &R1csFile<32>) -> Vec<IntermediateNode<Fie
                 if coeff.clone() == lookup_res_cloned.2 {
                     node_a.push(lookup_res_cloned.0);
                     used.push(lookup_res_cloned.1);
+                    continue;
+                }
+            }
+            if neg == true {
+                if coeff.clone() == minus_one {
+                    let node = IntermediateNode::new_from_variable(x_i.clone());
+                    node_a.push(node);
+                } else {
+                    let coeff_fr = Fr::from_repr(coeff.clone().0).unwrap();
+                    let new_coeff = FieldElement((coeff_fr * (Fr::zero() - Fr::one())).to_repr());
+                    let left = IntermediateNode::new_from_value(new_coeff.clone());
+                    let right = IntermediateNode::new_from_variable(x_i.clone());
+                    let node = IntermediateNode::<FieldElement<32>> {
+                        node_type: NodeType::Mult,
+                        left: Some(Box::new(left)),
+                        right: Some(Box::new(right)),
+                    };
+                    node_a.push(node);
                 }
             } else {
-                if neg == true {
-                    if coeff.clone() == minus_one {
-                        let node = IntermediateNode::new_from_variable(x_i.clone());
-                        node_a.push(node);
-                    } else {
-                        let coeff_fr = Fr::from_repr(coeff.clone().0).unwrap();
-                        let new_coeff =
-                            FieldElement((coeff_fr * (Fr::zero() - Fr::one())).to_repr());
-                        let left = IntermediateNode::new_from_value(new_coeff.clone());
-                        let right = IntermediateNode::new_from_variable(x_i.clone());
-                        let node = IntermediateNode::<FieldElement<32>> {
-                            node_type: NodeType::Mult,
-                            left: Some(Box::new(left)),
-                            right: Some(Box::new(right)),
-                        };
-                        node_a.push(node);
-                    }
+                if coeff.clone() == one {
+                    let node = IntermediateNode::new_from_variable(x_i.clone());
+                    node_a.push(node);
                 } else {
-                    if coeff.clone() == one {
-                        let node = IntermediateNode::new_from_variable(x_i.clone());
-                        node_a.push(node);
-                    } else {
-                        let left = IntermediateNode::new_from_value(coeff.clone());
-                        let right = IntermediateNode::new_from_variable(x_i.clone());
-                        let node = IntermediateNode::<FieldElement<32>> {
-                            node_type: NodeType::Mult,
-                            left: Some(Box::new(left)),
-                            right: Some(Box::new(right)),
-                        };
-                        node_a.push(node);
-                    }
+                    let left = IntermediateNode::new_from_value(coeff.clone());
+                    let right = IntermediateNode::new_from_variable(x_i.clone());
+                    let node = IntermediateNode::<FieldElement<32>> {
+                        node_type: NodeType::Mult,
+                        left: Some(Box::new(left)),
+                        right: Some(Box::new(right)),
+                    };
+                    node_a.push(node);
                 }
             }
         }
@@ -497,21 +494,21 @@ fn convert_constraints_to_nodes(r1cs: &R1csFile<32>) -> Vec<IntermediateNode<Fie
                 if coeff.clone() == lookup_res_cloned.2 {
                     node_b.push(lookup_res_cloned.0);
                     used.push(lookup_res_cloned.1);
+                    continue;
                 }
+            }
+            if coeff.clone() == one {
+                let node = IntermediateNode::new_from_variable(x_i.clone());
+                node_b.push(node);
             } else {
-                if coeff.clone() == one {
-                    let node = IntermediateNode::new_from_variable(x_i.clone());
-                    node_b.push(node);
-                } else {
-                    let left = IntermediateNode::new_from_value(coeff.clone());
-                    let right = IntermediateNode::new_from_variable(x_i.clone());
-                    let node = IntermediateNode::<FieldElement<32>> {
-                        node_type: NodeType::Mult,
-                        left: Some(Box::new(left)),
-                        right: Some(Box::new(right)),
-                    };
-                    node_b.push(node);
-                }
+                let left = IntermediateNode::new_from_value(coeff.clone());
+                let right = IntermediateNode::new_from_variable(x_i.clone());
+                let node = IntermediateNode::<FieldElement<32>> {
+                    node_type: NodeType::Mult,
+                    left: Some(Box::new(left)),
+                    right: Some(Box::new(right)),
+                };
+                node_b.push(node);
             }
         }
         if node_a.len() != 0 && node_b.len() != 0 {

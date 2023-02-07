@@ -23,6 +23,7 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
     z.push(z_zero);
 
     for i in 0..circuit.depth() {
+        println!("{}", i);
         let add = circuit.add(i);
         let mut add_res = vec![];
         if z[i].len() == 0 {
