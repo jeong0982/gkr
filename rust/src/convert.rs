@@ -134,86 +134,6 @@ fn merge_nodes(
     }
 }
 
-fn make_node_from_constraint(constraint: &Constraint<32>) -> IntermediateNode<FieldElement<32>> {
-    let minus_one = FieldElement::from((Fr::zero() - Fr::one()).to_repr());
-    let one = FieldElement(Fr::one().to_repr());
-    let mut a = &constraint.0;
-    let mut b = &constraint.1;
-    let mut c = &constraint.2;
-
-    let mut node_a = vec![];
-    let mut node_b = vec![];
-    let mut node_c = vec![];
-
-    for (coeff, x_i) in a {
-        if coeff.clone() == one {
-            let node = IntermediateNode::new_from_variable(x_i.clone());
-            node_a.push(node);
-        } else {
-            let left = IntermediateNode::new_from_value(coeff.clone());
-            let right = IntermediateNode::new_from_variable(x_i.clone());
-            let node = IntermediateNode::<FieldElement<32>> {
-                node_type: NodeType::Mult,
-                left: Some(Box::new(left)),
-                right: Some(Box::new(right)),
-            };
-            node_a.push(node);
-        }
-    }
-    for (coeff, x_i) in b {
-        if coeff.clone() == one {
-            let node = IntermediateNode::new_from_variable(x_i.clone());
-            node_b.push(node);
-        } else {
-            let left = IntermediateNode::new_from_value(coeff.clone());
-            let right = IntermediateNode::new_from_variable(x_i.clone());
-            let node = IntermediateNode::<FieldElement<32>> {
-                node_type: NodeType::Mult,
-                left: Some(Box::new(left)),
-                right: Some(Box::new(right)),
-            };
-            node_b.push(node);
-        }
-    }
-    for (coeff, x_i) in c {
-        if coeff.clone() == minus_one {
-            let node = IntermediateNode::new_from_variable(x_i.clone());
-            node_c.push(node);
-        } else {
-            let coeff_fr = Fr::from_repr(coeff.clone().0).unwrap();
-            let new_coeff = FieldElement((coeff_fr * (Fr::zero() - Fr::one())).to_repr());
-            let left = IntermediateNode::new_from_value(new_coeff.clone());
-            let right = IntermediateNode::new_from_variable(x_i.clone());
-            let node = IntermediateNode::<FieldElement<32>> {
-                node_type: NodeType::Mult,
-                left: Some(Box::new(left)),
-                right: Some(Box::new(right)),
-            };
-            node_c.push(node);
-        }
-    }
-    if node_a.len() != 0 && node_b.len() != 0 {
-        let root_a = merge_nodes(node_a);
-        let root_b = merge_nodes(node_b);
-        let root_c = merge_nodes(node_c);
-
-        let a_times_b = IntermediateNode {
-            node_type: NodeType::Mult,
-            left: Some(Box::new(root_a)),
-            right: Some(Box::new(root_b)),
-        };
-
-        IntermediateNode {
-            node_type: NodeType::Add,
-            left: Some(Box::new(a_times_b)),
-            right: Some(Box::new(root_c)),
-        }
-    } else {
-        // [] * [] - C = 0
-        merge_nodes(node_c)
-    }
-}
-
 fn get_k(n: usize) -> usize {
     let mut k = 0;
     let mut m = n;
@@ -250,6 +170,7 @@ fn compile(
     let mut next_nodes = vec![];
     let mut zero_index = None;
     for d in 0..(height + 1) {
+        println!("{}", current_nodes.len());
         let mut layer_operand_idx = vec![];
         let mut node_types = vec![];
         let k = get_k(current_nodes.len());
@@ -398,12 +319,259 @@ fn compile(
 }
 
 fn convert_constraints_to_nodes(r1cs: &R1csFile<32>) -> Vec<IntermediateNode<FieldElement<32>>> {
+    fn count_mult(v: &Vec<(FieldElement<32>, u32)>) -> (i32, i32) {
+        let one = FieldElement(Fr::one().to_repr());
+        let minus_one = FieldElement::from((Fr::zero() - Fr::one()).to_repr());
+        let mut a = 0;
+        let mut b = 0;
+        for (coeff, x_i) in v {
+            if coeff.clone() == one {
+                b += 1;
+            } else if coeff.clone() == minus_one {
+                a += 1;
+            } else {
+                a += 1;
+                b += 1;
+            }
+        }
+        (a, b)
+    }
+    fn update_symbol_table(
+        symbol_table: &mut HashMap<
+            u32,
+            (IntermediateNode<FieldElement<32>>, usize, FieldElement<32>),
+        >,
+        a: &IntermediateNode<FieldElement<32>>,
+        c: &Vec<(FieldElement<32>, u32)>,
+        idx: usize,
+        neg: &bool,
+    ) -> () {
+        fn make_node_except_i(
+            i: usize,
+            v: &Vec<(FieldElement<32>, u32)>,
+            neg: &bool,
+        ) -> IntermediateNode<FieldElement<32>> {
+            let minus_one = FieldElement::from((Fr::zero() - Fr::one()).to_repr());
+            let mut node_c = vec![];
+            let one = FieldElement(Fr::one().to_repr());
+            for (idx, (coeff, x_i)) in v.iter().enumerate() {
+                if idx == i {
+                    continue;
+                }
+                if neg.clone() == true {
+                    if coeff.clone() == one {
+                        let node = IntermediateNode::new_from_variable(x_i.clone());
+                        node_c.push(node);
+                    } else {
+                        let left = IntermediateNode::new_from_value(coeff.clone());
+                        let right = IntermediateNode::new_from_variable(x_i.clone());
+                        let node = IntermediateNode::<FieldElement<32>> {
+                            node_type: NodeType::Mult,
+                            left: Some(Box::new(left)),
+                            right: Some(Box::new(right)),
+                        };
+                        node_c.push(node);
+                    }
+                } else {
+                    if coeff.clone() == minus_one {
+                        let node = IntermediateNode::new_from_variable(x_i.clone());
+                        node_c.push(node);
+                    } else {
+                        let coeff_fr = Fr::from_repr(coeff.clone().0).unwrap();
+                        let new_coeff =
+                            FieldElement((coeff_fr * (Fr::zero() - Fr::one())).to_repr());
+                        let left = IntermediateNode::new_from_value(new_coeff.clone());
+                        let right = IntermediateNode::new_from_variable(x_i.clone());
+                        let node = IntermediateNode::<FieldElement<32>> {
+                            node_type: NodeType::Mult,
+                            left: Some(Box::new(left)),
+                            right: Some(Box::new(right)),
+                        };
+                        node_c.push(node);
+                    }
+                }
+            }
+
+            merge_nodes(node_c)
+        }
+        if c.len() == 1 {
+            if neg.clone() {
+                let coeff = Fr::from_repr(c[0].0.clone().0).unwrap();
+                let new_coeff = FieldElement((coeff * (Fr::zero() - Fr::one())).to_repr());
+                symbol_table.insert(c[0].1.clone(), (a.clone(), idx, new_coeff));
+            } else {
+                symbol_table.insert(c[0].1.clone(), (a.clone(), idx, c[0].0.clone()));
+            }
+        } else {
+            for (i, (coeff, x_i)) in c.iter().enumerate() {
+                let node = make_node_except_i(i, &c, neg);
+                let res = IntermediateNode {
+                    node_type: NodeType::Add,
+                    left: Some(Box::new(a.clone())),
+                    right: Some(Box::new(node)),
+                };
+                symbol_table.insert(x_i.clone(), (res, idx, coeff.clone()));
+            }
+        }
+    }
+
+    let mut used = vec![];
+
     let constraints = &r1cs.constraints;
     let mut nodes = vec![];
-    for constraint in &constraints.0 {
-        nodes.push(make_node_from_constraint(constraint));
+    let mut sym_tbl: HashMap<u32, (IntermediateNode<FieldElement<32>>, usize, FieldElement<32>)> =
+        HashMap::new();
+    let one = FieldElement(Fr::one().to_repr());
+    let minus_one = FieldElement::from((Fr::zero() - Fr::one()).to_repr());
+    for (i, constraint) in constraints.0.iter().enumerate() {
+        let mut neg = false;
+        let mut a = &constraint.0;
+        let mut b = &constraint.1;
+        let mut c = &constraint.2;
+
+        let mut node_a = vec![];
+        let mut node_b = vec![];
+        let mut node_c = vec![];
+
+        let mut mult_cnt_minus = 0;
+
+        let cnt_a = count_mult(a);
+        let cnt_b = count_mult(b);
+        let cnt_c = count_mult(c);
+
+        let mult_cnt = cnt_a.0 + cnt_b.0 + cnt_c.0;
+        let m_mult_cnt = cnt_a.1 + cnt_b.1 + cnt_c.1;
+
+        if mult_cnt > m_mult_cnt {
+            neg = true;
+        }
+        for (coeff, x_i) in a {
+            if sym_tbl.contains_key(x_i) {
+                let lookup_res = sym_tbl.get(x_i).unwrap().clone();
+                if coeff.clone() == lookup_res.2 {
+                    node_a.push(lookup_res.0);
+                    used.push(lookup_res.1);
+                }
+            }
+
+            if neg == true {
+                if coeff.clone() == minus_one {
+                    let node = IntermediateNode::new_from_variable(x_i.clone());
+                    node_a.push(node);
+                } else {
+                    let coeff_fr = Fr::from_repr(coeff.clone().0).unwrap();
+                    let new_coeff = FieldElement((coeff_fr * (Fr::zero() - Fr::one())).to_repr());
+                    let left = IntermediateNode::new_from_value(new_coeff.clone());
+                    let right = IntermediateNode::new_from_variable(x_i.clone());
+                    let node = IntermediateNode::<FieldElement<32>> {
+                        node_type: NodeType::Mult,
+                        left: Some(Box::new(left)),
+                        right: Some(Box::new(right)),
+                    };
+                    node_a.push(node);
+                }
+            } else {
+                if coeff.clone() == one {
+                    let node = IntermediateNode::new_from_variable(x_i.clone());
+                    node_a.push(node);
+                } else {
+                    let left = IntermediateNode::new_from_value(coeff.clone());
+                    let right = IntermediateNode::new_from_variable(x_i.clone());
+                    let node = IntermediateNode::<FieldElement<32>> {
+                        node_type: NodeType::Mult,
+                        left: Some(Box::new(left)),
+                        right: Some(Box::new(right)),
+                    };
+                    node_a.push(node);
+                }
+            }
+        }
+        for (coeff, x_i) in b {
+            if sym_tbl.contains_key(x_i) {
+                let lookup_res = sym_tbl.get(x_i).unwrap().clone();
+                if coeff.clone() == lookup_res.2 {
+                    node_a.push(lookup_res.0);
+                    used.push(lookup_res.1);
+                }
+            }
+            if coeff.clone() == one {
+                let node = IntermediateNode::new_from_variable(x_i.clone());
+                node_b.push(node);
+            } else {
+                let left = IntermediateNode::new_from_value(coeff.clone());
+                let right = IntermediateNode::new_from_variable(x_i.clone());
+                let node = IntermediateNode::<FieldElement<32>> {
+                    node_type: NodeType::Mult,
+                    left: Some(Box::new(left)),
+                    right: Some(Box::new(right)),
+                };
+                node_b.push(node);
+            }
+        }
+        if node_a.len() != 0 && node_b.len() != 0 {
+            let root_a = merge_nodes(node_a);
+            let root_b = merge_nodes(node_b);
+            let a_times_b = IntermediateNode {
+                node_type: NodeType::Mult,
+                left: Some(Box::new(root_a)),
+                right: Some(Box::new(root_b)),
+            };
+            update_symbol_table(&mut sym_tbl, &a_times_b, c, i, &neg);
+
+            for (coeff, x_i) in c {
+                if neg == true {
+                    if coeff.clone() == one {
+                        let node = IntermediateNode::new_from_variable(x_i.clone());
+                        node_c.push(node);
+                    } else {
+                        let left = IntermediateNode::new_from_value(coeff.clone());
+                        let right = IntermediateNode::new_from_variable(x_i.clone());
+                        let node = IntermediateNode::<FieldElement<32>> {
+                            node_type: NodeType::Mult,
+                            left: Some(Box::new(left)),
+                            right: Some(Box::new(right)),
+                        };
+                        node_c.push(node);
+                    }
+                } else {
+                    if coeff.clone() == minus_one {
+                        let node = IntermediateNode::new_from_variable(x_i.clone());
+                        node_c.push(node);
+                    } else {
+                        let coeff_fr = Fr::from_repr(coeff.clone().0).unwrap();
+                        let new_coeff =
+                            FieldElement((coeff_fr * (Fr::zero() - Fr::one())).to_repr());
+                        let left = IntermediateNode::new_from_value(new_coeff.clone());
+                        let right = IntermediateNode::new_from_variable(x_i.clone());
+                        let node = IntermediateNode::<FieldElement<32>> {
+                            node_type: NodeType::Mult,
+                            left: Some(Box::new(left)),
+                            right: Some(Box::new(right)),
+                        };
+                        node_c.push(node);
+                    }
+                }
+            }
+            let root_c = merge_nodes(node_c);
+
+            nodes.push(IntermediateNode {
+                node_type: NodeType::Add,
+                left: Some(Box::new(a_times_b)),
+                right: Some(Box::new(root_c)),
+            });
+        } else {
+            // [] * [] - C = 0
+            nodes.push(merge_nodes(node_c));
+        }
     }
-    nodes
+
+    let mut opt_nodes = vec![];
+    for (i, node) in nodes.iter().enumerate() {
+        if !used.contains(&i) {
+            opt_nodes.push(node.clone());
+        }
+    }
+    opt_nodes
 }
 
 pub struct Output<S: PrimeField> {

@@ -80,7 +80,7 @@ pub fn prove_sumcheck_opt<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
 
     let g_1 = add_univariate(&g_1_add, &g_1_mult);
     proof.push(g_1.clone());
-    
+
     let mimc_g1_coeffs = g_1.iter().map(|s| convert_s_to_fr(s)).collect();
     let r_1 = mimc.multi_hash(mimc_g1_coeffs, &Fr::from(0));
     r.push(convert_fr_to_s(r_1));
@@ -96,33 +96,33 @@ pub fn prove_sumcheck_opt<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
         let add_assignments: Vec<Vec<S>> = n_trailing_bits(add_wire, v - j - 1);
         let mult_assignments: Vec<Vec<S>> = n_trailing_bits(mult_wire, v - j - 1);
         let g_j_add = add_assignments
-        .par_iter()
-        .map(|assignment| {
-            let f1_j_sub = partial_eval_from(&f1_j, assignment, j + 2);
-            let f2_j_sub = partial_eval_from(&f2_j, assignment, j + 2);
-            let add_j_sub = partial_eval_from_binary_form(&add_j.clone(), assignment, j + 2);
+            .par_iter()
+            .map(|assignment| {
+                let f1_j_sub = partial_eval_from(&f1_j, assignment, j + 2);
+                let f2_j_sub = partial_eval_from(&f2_j, assignment, j + 2);
+                let add_j_sub = partial_eval_from_binary_form(&add_j.clone(), assignment, j + 2);
 
-            let f1_j_coeffs = get_univariate_coeff(&f1_j_sub, j + 1, false);
-            let f2_j_coeffs = get_univariate_coeff(&f2_j_sub, j + 1, false);
-            let add_j_coeffs = get_univariate_coeff(&add_j_sub, j + 1, true);
-            let f1_f2_add = add_univariate(&f1_j_coeffs, &f2_j_coeffs);
-            mult_univariate(&f1_f2_add, &add_j_coeffs)
-        })
-        .reduce(|| vec![], |a, b| add_univariate(&a, &b));
+                let f1_j_coeffs = get_univariate_coeff(&f1_j_sub, j + 1, false);
+                let f2_j_coeffs = get_univariate_coeff(&f2_j_sub, j + 1, false);
+                let add_j_coeffs = get_univariate_coeff(&add_j_sub, j + 1, true);
+                let f1_f2_add = add_univariate(&f1_j_coeffs, &f2_j_coeffs);
+                mult_univariate(&f1_f2_add, &add_j_coeffs)
+            })
+            .reduce(|| vec![], |a, b| add_univariate(&a, &b));
         let g_j_mult = mult_assignments
-        .par_iter()
-        .map(|assignment| {
-            let f1_j_sub = partial_eval_from(&f1_j, assignment, j + 2);
-            let f2_j_sub = partial_eval_from(&f2_j, assignment, j + 2);
-            let mult_j_sub = partial_eval_from_binary_form(&mult_j.clone(), assignment, j + 2);
+            .par_iter()
+            .map(|assignment| {
+                let f1_j_sub = partial_eval_from(&f1_j, assignment, j + 2);
+                let f2_j_sub = partial_eval_from(&f2_j, assignment, j + 2);
+                let mult_j_sub = partial_eval_from_binary_form(&mult_j.clone(), assignment, j + 2);
 
-            let f1_j_coeffs = get_univariate_coeff(&f1_j_sub, j + 1, false);
-            let f2_j_coeffs = get_univariate_coeff(&f2_j_sub, j + 1, false);
-            let mult_j_coeffs = get_univariate_coeff(&mult_j_sub, j + 1, true);
-            let f1_f2_mult = mult_univariate(&f1_j_coeffs, &f2_j_coeffs);
-            mult_univariate(&f1_f2_mult, &mult_j_coeffs)
-        })
-        .reduce(|| vec![], |a, b| add_univariate(&a, &b));
+                let f1_j_coeffs = get_univariate_coeff(&f1_j_sub, j + 1, false);
+                let f2_j_coeffs = get_univariate_coeff(&f2_j_sub, j + 1, false);
+                let mult_j_coeffs = get_univariate_coeff(&mult_j_sub, j + 1, true);
+                let f1_f2_mult = mult_univariate(&f1_j_coeffs, &f2_j_coeffs);
+                mult_univariate(&f1_f2_mult, &mult_j_coeffs)
+            })
+            .reduce(|| vec![], |a, b| add_univariate(&a, &b));
         let g_j = add_univariate(&g_j_add, &g_j_mult);
         proof.push(g_j.clone());
 

@@ -178,7 +178,11 @@ pub fn partial_eval_i<S: PrimeField<Repr = [u8; 32]>>(
     res_f
 }
 
-pub fn partial_eval_from<S: PrimeField<Repr = [u8; 32]>>(f: &Vec<Vec<S>>, r: &Vec<S>, idx: usize) -> Vec<Vec<S>> {
+pub fn partial_eval_from<S: PrimeField<Repr = [u8; 32]>>(
+    f: &Vec<Vec<S>>,
+    r: &Vec<S>,
+    idx: usize,
+) -> Vec<Vec<S>> {
     assert!(f[0].len() > r.len());
     if r.len() == 0 {
         return f.clone();
