@@ -3,13 +3,15 @@ use std::{env::current_dir, fs::File, io::Read, path::PathBuf, process::Command}
 use crate::{
     convert::{convert_r1cs_wtns_gkr, Output},
     file_utils::{execute_circom, get_name, stringify_fr, write_aggregated_input, write_output},
-    gkr::{prover, Proof},
+    gkr::{prover, Proof, GKRCircuit, Input},
 };
 use halo2curves::bn256::Fr;
 use r1cs_file::*;
 use serde::{Deserialize, Serialize};
 use tera::{Context, Tera};
 use wtns_file::*;
+
+use rayon::prelude::*;
 
 /// Circom-GKR
 struct Meta(Vec<usize>);
@@ -440,12 +442,12 @@ pub fn prove_recursively_circom(
     let wtns = WtnsFile::<32>::read(File::open(wtns_path).unwrap()).unwrap();
 
     let result = convert_r1cs_wtns_gkr(r1cs, wtns, sym);
-    let mut proofs = vec![];
     println!("Proving starts..");
-    for (circuit, input) in result.0.iter().zip(result.1.iter()) {
-        let proof = prover::prove(circuit, input);
-        proofs.push(proof);
-    }
+
+    let circuit_input_pairs: Vec<(&GKRCircuit<Fr>, &Input<Fr>)> = result.0.iter().zip(result.1.iter()).collect();
+    let proofs: Vec<Proof<Fr>> = circuit_input_pairs.par_iter().map(|(circuit, input)| {
+        prover::prove(circuit, input)
+    }).collect();
 
     let output_name = format!("{}_output.json", &input_name);
     let output_path = format!("{}{}", root_path.clone(), output_name);
@@ -489,12 +491,13 @@ pub fn prove_all(circuit_path: String, input_paths: Vec<String>) {
             let sym = format!("{}{}", root_path.clone(), sym_name);
 
             let result = convert_r1cs_wtns_gkr(r1cs, wtns, sym);
-            let mut new_proofs = vec![];
             println!("Proving starts..");
-            for (circuit, input) in result.0.iter().zip(result.1.iter()) {
-                let proof = prover::prove(circuit, input);
-                new_proofs.push(proof);
-            }
+
+            let circuit_input_pairs: Vec<(&GKRCircuit<Fr>, &Input<Fr>)> = result.0.iter().zip(result.1.iter()).collect();
+            let new_proofs: Vec<Proof<Fr>> = circuit_input_pairs.par_iter().map(|(circuit, input)| {
+                prover::prove(circuit, input)
+            }).collect();
+
             proofs = Some(new_proofs);
             let output_name = format!("{}_output.json", &input_name);
             let output_path = format!("{}{}", root_path.clone(), output_name);
