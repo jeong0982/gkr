@@ -7,6 +7,8 @@ use halo2curves::group::ff::PrimeField;
 use rayon::prelude::*;
 use std::{collections::HashMap, fmt::Debug, fs::File, io::Read, ops::Deref};
 
+const DEPTH_LIMIT: usize = 40;
+
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 enum Expression<T> {
     Value(T),
@@ -446,34 +448,60 @@ fn convert_constraints_to_nodes(r1cs: &R1csFile<32>) -> Vec<IntermediateNode<Fie
             neg = true;
         }
         for (coeff, x_i) in a {
-            if sym_tbl.contains_key(x_i) {
-                let lookup_res = sym_tbl.get(x_i).unwrap().clone();
-                if coeff.clone() == lookup_res.2 {
-                    node_a.push(lookup_res.0);
-                    used.push(lookup_res.1);
+            let e = sym_tbl.get(x_i);
+            if let Some(lookup_res) = e && lookup_res.0.depth() < DEPTH_LIMIT {
+                let lookup_res_cloned = lookup_res.clone();
+                if coeff.clone() == lookup_res_cloned.2 {
+                    node_a.push(lookup_res_cloned.0);
+                    used.push(lookup_res_cloned.1);
+                }
+            } else {
+                if neg == true {
+                    if coeff.clone() == minus_one {
+                        let node = IntermediateNode::new_from_variable(x_i.clone());
+                        node_a.push(node);
+                    } else {
+                        let coeff_fr = Fr::from_repr(coeff.clone().0).unwrap();
+                        let new_coeff =
+                            FieldElement((coeff_fr * (Fr::zero() - Fr::one())).to_repr());
+                        let left = IntermediateNode::new_from_value(new_coeff.clone());
+                        let right = IntermediateNode::new_from_variable(x_i.clone());
+                        let node = IntermediateNode::<FieldElement<32>> {
+                            node_type: NodeType::Mult,
+                            left: Some(Box::new(left)),
+                            right: Some(Box::new(right)),
+                        };
+                        node_a.push(node);
+                    }
+                } else {
+                    if coeff.clone() == one {
+                        let node = IntermediateNode::new_from_variable(x_i.clone());
+                        node_a.push(node);
+                    } else {
+                        let left = IntermediateNode::new_from_value(coeff.clone());
+                        let right = IntermediateNode::new_from_variable(x_i.clone());
+                        let node = IntermediateNode::<FieldElement<32>> {
+                            node_type: NodeType::Mult,
+                            left: Some(Box::new(left)),
+                            right: Some(Box::new(right)),
+                        };
+                        node_a.push(node);
+                    }
                 }
             }
-
-            if neg == true {
-                if coeff.clone() == minus_one {
-                    let node = IntermediateNode::new_from_variable(x_i.clone());
-                    node_a.push(node);
-                } else {
-                    let coeff_fr = Fr::from_repr(coeff.clone().0).unwrap();
-                    let new_coeff = FieldElement((coeff_fr * (Fr::zero() - Fr::one())).to_repr());
-                    let left = IntermediateNode::new_from_value(new_coeff.clone());
-                    let right = IntermediateNode::new_from_variable(x_i.clone());
-                    let node = IntermediateNode::<FieldElement<32>> {
-                        node_type: NodeType::Mult,
-                        left: Some(Box::new(left)),
-                        right: Some(Box::new(right)),
-                    };
-                    node_a.push(node);
+        }
+        for (coeff, x_i) in b {
+            let e = sym_tbl.get(x_i);
+            if let Some(lookup_res) = e && lookup_res.0.depth() < DEPTH_LIMIT {
+                let lookup_res_cloned = lookup_res.clone();
+                if coeff.clone() == lookup_res_cloned.2 {
+                    node_b.push(lookup_res_cloned.0);
+                    used.push(lookup_res_cloned.1);
                 }
             } else {
                 if coeff.clone() == one {
                     let node = IntermediateNode::new_from_variable(x_i.clone());
-                    node_a.push(node);
+                    node_b.push(node);
                 } else {
                     let left = IntermediateNode::new_from_value(coeff.clone());
                     let right = IntermediateNode::new_from_variable(x_i.clone());
@@ -482,30 +510,8 @@ fn convert_constraints_to_nodes(r1cs: &R1csFile<32>) -> Vec<IntermediateNode<Fie
                         left: Some(Box::new(left)),
                         right: Some(Box::new(right)),
                     };
-                    node_a.push(node);
+                    node_b.push(node);
                 }
-            }
-        }
-        for (coeff, x_i) in b {
-            if sym_tbl.contains_key(x_i) {
-                let lookup_res = sym_tbl.get(x_i).unwrap().clone();
-                if coeff.clone() == lookup_res.2 {
-                    node_a.push(lookup_res.0);
-                    used.push(lookup_res.1);
-                }
-            }
-            if coeff.clone() == one {
-                let node = IntermediateNode::new_from_variable(x_i.clone());
-                node_b.push(node);
-            } else {
-                let left = IntermediateNode::new_from_value(coeff.clone());
-                let right = IntermediateNode::new_from_variable(x_i.clone());
-                let node = IntermediateNode::<FieldElement<32>> {
-                    node_type: NodeType::Mult,
-                    left: Some(Box::new(left)),
-                    right: Some(Box::new(right)),
-                };
-                node_b.push(node);
             }
         }
         if node_a.len() != 0 && node_b.len() != 0 {

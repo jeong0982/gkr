@@ -1,3 +1,5 @@
+#![feature(let_chains)]
+
 use ff::PrimeField;
 mod aggregator;
 mod convert;
