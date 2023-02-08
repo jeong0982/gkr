@@ -1,7 +1,6 @@
 use clap::{Parser, Subcommand};
-use r1cs_file::*;
-use std::{fs::File, io::Result};
-use wtns_file::*;
+use std::io::{self, Write};
+use std::{io::Result, process::Command};
 
 extern crate gkr;
 use gkr::aggregator::prove_all;
@@ -21,6 +20,10 @@ enum Commands {
         #[arg(short, long, num_args=0..)]
         inputs: Vec<String>,
     },
+    MockGroth {
+        #[arg(short, long)]
+        zkey: String,
+    },
 }
 
 fn main() -> Result<()> {
@@ -31,8 +34,31 @@ fn main() -> Result<()> {
             let circuit_path = circuit.clone();
             let input_paths = inputs.clone();
             prove_all(circuit_path, input_paths);
-        },
-        None => {},
+        }
+        Some(Commands::MockGroth { zkey }) => {
+            println!("mock groth16 running..");
+            let output = Command::new("snarkjs")
+                .arg("zkey")
+                .arg("verify")
+                .arg("aggregated.r1cs")
+                .arg("pot.ptau")
+                .arg(zkey.clone())
+                .output()
+                .expect("zkey verification failed");
+            std::io::stdout().write_all(&output.stdout).unwrap();
+            let output = Command::new("snarkjs")
+                .arg("groth16")
+                .arg("prove")
+                .arg(zkey.clone())
+                .arg("witness.wtns")
+                .arg("proof.json")
+                .arg("public.json")
+                .output()
+                .expect("proving failed");
+            std::io::stdout().write_all(&output.stdout).unwrap();
+            println!("Aggregation is done.");
+        }
+        None => {}
     }
 
     Ok(())

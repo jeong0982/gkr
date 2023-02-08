@@ -452,7 +452,7 @@ pub fn prove_recursively_circom(
         .par_iter()
         .map(|(circuit, input)| prover::prove(circuit, input))
         .collect();
-    
+
     let time = report_elapsed(now);
     println!("{}\n", format!("Proving {}", time).blue().bold());
     let output_name = format!("{}_output.json", &input_name);
@@ -513,7 +513,7 @@ pub fn prove_all(circuit_path: String, input_paths: Vec<String>) {
                 .par_iter()
                 .map(|(circuit, input)| prover::prove(circuit, input))
                 .collect();
-            
+
             let time = report_elapsed(now);
             println!("{}\n", format!("Proving {}", time).blue().bold());
             proofs = Some(new_proofs);

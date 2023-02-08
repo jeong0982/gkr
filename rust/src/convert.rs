@@ -7,7 +7,7 @@ use halo2curves::group::ff::PrimeField;
 use rayon::prelude::*;
 use std::{collections::HashMap, fmt::Debug, fs::File, io::Read, ops::Deref};
 
-const DEPTH_LIMIT: usize = 10;
+const DEPTH_LIMIT: usize = 5;
 const WIDTH_LIMIT: usize = 20;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
