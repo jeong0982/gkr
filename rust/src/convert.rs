@@ -7,7 +7,8 @@ use halo2curves::group::ff::PrimeField;
 use rayon::prelude::*;
 use std::{collections::HashMap, fmt::Debug, fs::File, io::Read, ops::Deref};
 
-const DEPTH_LIMIT: usize = 20;
+const DEPTH_LIMIT: usize = 10;
+const WIDTH_LIMIT: usize = 20;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 enum Expression<T> {
@@ -151,7 +152,7 @@ fn get_k(n: usize) -> usize {
 }
 
 fn compile(
-    nodes: Vec<IntermediateNode<FieldElement<32>>>,
+    nodes: Vec<Vec<IntermediateNode<FieldElement<32>>>>,
 ) -> (
     Vec<Vec<IntermediateLayer<FieldElement<32>>>>,
     Vec<Vec<NodeType<FieldElement<32>>>>,
@@ -159,19 +160,47 @@ fn compile(
     println!("Compile nodes..");
     let mut total = vec![];
     let mut total_inputs = vec![];
-    for one_node in nodes {
+
+    let mut nodes_sorted = nodes.clone();
+    nodes_sorted.sort_by(|a, b| {
+        let a_height = a.iter().map(|node| node.depth()).max().unwrap_or(0);
+        let b_height = b.iter().map(|node| node.depth()).max().unwrap_or(0);
+        a_height.cmp(&b_height)
+    });
+
+    let mut width = nodes_sorted.len();
+    while width > WIDTH_LIMIT {
+        let mut new_nodes = vec![];
+        let new_width = width / 2;
+        for i in 0..new_width {
+            let mut first = nodes_sorted[2 * i].clone();
+            let second = nodes_sorted[2 * i + 1].clone();
+            first.extend(second);
+            new_nodes.push(first);
+        }
+        if width % 2 == 1 {
+            new_nodes.push(nodes_sorted[width - 1].clone());
+        }
+        nodes_sorted = new_nodes;
+        width = nodes_sorted.len();
+    }
+    for one_circuit in nodes_sorted.iter() {
         let mut layers = vec![];
 
         let zero = FieldElement::from((Fr::zero()).to_repr());
 
-        let height = one_node.depth();
+        let height = one_circuit
+            .iter()
+            .map(|node| node.depth())
+            .max()
+            .unwrap_or(0);
         if height == 0 {
             return (vec![layers], vec![]);
         }
         let mut inputs = vec![];
 
         let mut used: HashMap<Expression<FieldElement<32>>, usize> = HashMap::new();
-        let mut current_nodes = vec![one_node];
+        let mut current_nodes = one_circuit.clone();
         let mut next_nodes = vec![];
         let mut zero_index = None;
         for d in 0..(height + 1) {
@@ -328,7 +357,9 @@ fn compile(
     (total, total_inputs)
 }
 
-fn convert_constraints_to_nodes(r1cs: &R1csFile<32>) -> Vec<IntermediateNode<FieldElement<32>>> {
+fn convert_constraints_to_nodes(
+    r1cs: &R1csFile<32>,
+) -> Vec<Vec<IntermediateNode<FieldElement<32>>>> {
     fn count_mult(v: &Vec<(FieldElement<32>, u32)>) -> (i32, i32) {
         let one = FieldElement(Fr::one().to_repr());
         let minus_one = FieldElement::from((Fr::zero() - Fr::one()).to_repr());
@@ -595,7 +626,7 @@ fn convert_constraints_to_nodes(r1cs: &R1csFile<32>) -> Vec<IntermediateNode<Fie
     let mut opt_nodes = vec![];
     for (i, node) in nodes.iter().enumerate() {
         if !used.contains(&i) {
-            opt_nodes.push(node.clone());
+            opt_nodes.push(vec![node.clone()]);
         }
     }
     opt_nodes

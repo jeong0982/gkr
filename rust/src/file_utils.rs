@@ -81,7 +81,7 @@ pub fn execute_circom(path: String, input_path: &String) -> (String, String) {
         .arg("--wasm")
         .output()
         .expect("circom command failed");
-    println!("");
+    print!("");
     let path_str: Vec<&str> = path.as_str().split('/').collect();
     let mut path_cloned = path_str.clone();
     path_cloned.pop();
@@ -109,6 +109,6 @@ pub fn execute_circom(path: String, input_path: &String) -> (String, String) {
         .arg("witness.wtns")
         .status()
         .expect("witness calculator generation failed");
-    println!("");
+    print!("");
     (String::from(name), root_path)
 }

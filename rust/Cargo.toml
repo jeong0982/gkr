@@ -3,6 +3,14 @@ name = "gkr"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "gkr"
+path = "src/lib.rs"
+
+[[bin]]
+name = "gkr-aggregator"
+path = "src/bin.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -10,7 +18,7 @@ r1cs-file = { git = "https://github.com/jeong0982/zeropool-utils" }
 wtns-file = { git = "https://github.com/jeong0982/zeropool-utils" }
 
 # field element
-halo2curves = { git = "https://github.com/privacy-scaling-explorations/halo2curves" }
+halo2curves = { git = "https://github.com/privacy-scaling-explorations/halo2curves", tag = "0.2.1", package = "halo2curves" }
 ff = "0.12.0"
 ethers-core = "0.17"
 num-bigint = "0.4.3"
@@ -23,6 +31,7 @@ mimc-rs = { git = "https://github.com/jeong0982/mimc-rs" }
 clap = { version = "4.0", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+colored = "2.0.0"
 
 # file
 tera = "1"

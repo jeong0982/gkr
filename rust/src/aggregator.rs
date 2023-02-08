@@ -1,10 +1,11 @@
-use std::{env::current_dir, fs::File, io::Read, path::PathBuf, process::Command};
+use std::{env::current_dir, fs::File, io::Read, path::PathBuf, process::Command, time::Instant};
 
 use crate::{
     convert::{convert_r1cs_wtns_gkr, Output},
     file_utils::{execute_circom, get_name, stringify_fr, write_aggregated_input, write_output},
-    gkr::{prover, Proof, GKRCircuit, Input},
+    gkr::{prover, GKRCircuit, Input, Proof},
 };
+use colored::Colorize;
 use halo2curves::bn256::Fr;
 use r1cs_file::*;
 use serde::{Deserialize, Serialize};
@@ -439,20 +440,32 @@ pub fn prove_recursively_circom(
     let r1cs = R1csFile::<32>::read(File::open(r1cs_path).unwrap()).unwrap();
 
     let wtns_path = current_dir().unwrap().join("witness.wtns");
+    println!("Writing new witness..");
     let wtns = WtnsFile::<32>::read(File::open(wtns_path).unwrap()).unwrap();
 
     let result = convert_r1cs_wtns_gkr(r1cs, wtns, sym);
     println!("Proving starts..");
-
-    let circuit_input_pairs: Vec<(&GKRCircuit<Fr>, &Input<Fr>)> = result.0.iter().zip(result.1.iter()).collect();
-    let proofs: Vec<Proof<Fr>> = circuit_input_pairs.par_iter().map(|(circuit, input)| {
-        prover::prove(circuit, input)
-    }).collect();
-
+    let now = Instant::now();
+    let circuit_input_pairs: Vec<(&GKRCircuit<Fr>, &Input<Fr>)> =
+        result.0.iter().zip(result.1.iter()).collect();
+    let proofs: Vec<Proof<Fr>> = circuit_input_pairs
+        .par_iter()
+        .map(|(circuit, input)| prover::prove(circuit, input))
+        .collect();
+    
+    let time = report_elapsed(now);
+    println!("{}\n", format!("Proving {}", time).blue().bold());
     let output_name = format!("{}_output.json", &input_name);
     let output_path = format!("{}{}", root_path.clone(), output_name);
     write_output(output_path, result.2);
     proofs
+}
+
+fn report_elapsed(now: Instant) -> String {
+    format!(
+        "{}",
+        format!("took {:?} seconds", now.elapsed().as_secs_f32())
+    )
 }
 
 pub fn prove_groth(circuit_path: String, previous_proofs: Vec<Proof<Fr>>, input_path: String) {
@@ -462,9 +475,10 @@ pub fn prove_groth(circuit_path: String, previous_proofs: Vec<Proof<Fr>>, input_
     for proof in modified_proof {
         p_vec.push(CircomInputProof::new_from_proof(proof));
     }
-    let _aggregated_input_path = write_aggregated_input(input_path, p_vec);
-    let _aggregated_circuit_path = modify_circom_file(circuit_path, &meta);
-    println!("Proving by groth..");
+    let aggregated_input_path = write_aggregated_input(input_path, p_vec);
+    let aggregated_circuit_path = modify_circom_file(circuit_path, &meta);
+    let circom_result = execute_circom(aggregated_circuit_path.clone(), &aggregated_input_path);
+    println!("{}", format!("Proving by groth16 can be done").bold());
 }
 
 pub fn prove_all(circuit_path: String, input_paths: Vec<String>) {
@@ -485,19 +499,23 @@ pub fn prove_all(circuit_path: String, input_paths: Vec<String>) {
             let sym_name = format!("{}.sym", name.clone());
 
             let wtns_path = current_dir().unwrap().join("witness.wtns");
-            println!("Writing new witness");
+            println!("Writing new witness..");
             let wtns = WtnsFile::<32>::read(File::open(wtns_path).unwrap()).unwrap();
 
             let sym = format!("{}{}", root_path.clone(), sym_name);
 
             let result = convert_r1cs_wtns_gkr(r1cs, wtns, sym);
             println!("Proving starts..");
-
-            let circuit_input_pairs: Vec<(&GKRCircuit<Fr>, &Input<Fr>)> = result.0.iter().zip(result.1.iter()).collect();
-            let new_proofs: Vec<Proof<Fr>> = circuit_input_pairs.par_iter().map(|(circuit, input)| {
-                prover::prove(circuit, input)
-            }).collect();
-
+            let now = Instant::now();
+            let circuit_input_pairs: Vec<(&GKRCircuit<Fr>, &Input<Fr>)> =
+                result.0.iter().zip(result.1.iter()).collect();
+            let new_proofs: Vec<Proof<Fr>> = circuit_input_pairs
+                .par_iter()
+                .map(|(circuit, input)| prover::prove(circuit, input))
+                .collect();
+            
+            let time = report_elapsed(now);
+            println!("{}\n", format!("Proving {}", time).blue().bold());
             proofs = Some(new_proofs);
             let output_name = format!("{}_output.json", &input_name);
             let output_path = format!("{}{}", root_path.clone(), output_name);
@@ -526,7 +544,6 @@ mod tests {
         input_paths.push(String::from("./example/input1.json"));
         input_paths.push(String::from("./example/input2.json"));
         input_paths.push(String::from("./example/input3.json"));
-        input_paths.push(String::from("./example/input4.json"));
         prove_all(circuit_path, input_paths);
     }
 
