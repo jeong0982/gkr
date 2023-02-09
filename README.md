@@ -14,17 +14,17 @@ snarkjs --help
 circom --help
 ```
 ## How to use
-1. Install gkr
+### 1. Install gkr
 ```sh
 cargo install --path ./rust
 ```
-2. Move to `./rust`
+### 2. Move to `./rust`
 ```sh
 cd rust
 ```
-3. Write a circuit in `./rust` and inputs in `./rust/example/` (`/example` is not mandatory)
+### 3. Write a circuit in `./rust` and inputs in `./rust/example/` (`/example` is not mandatory)
 
-4. Create GKR proof for inputs
+### 4. Create GKR proof for inputs
 You can give inputs by commands:
 ```sh
 gkr-aggregator -c circuit.circom -i ./example/input1.json ./example/input2.json ./example/input3.json
@@ -35,7 +35,7 @@ You can get a message from cli:
 Proving by groth16 can be done
 ```
 
-4. Prepare zkey
+### 4. Prepare zkey
 You should prepare an appropriate ptau file.
 ```sh
 snarkjs groth16 setup aggregated.r1cs pot.ptau c0.zkey
@@ -46,7 +46,7 @@ Give random string for contribution, and then
 snarkjs zkey beacon c1.zkey c.zkey 0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f 10 -n="Final Beacon phase2"
 ```
 
-5. Create aggregated Groth16 proof
+### 5. Create aggregated Groth16 proof
 ```sh
 gkr-aggregator mock-groth -z c.zkey
 ```
