@@ -23,13 +23,10 @@ pub struct CircomInputProof {
     pub sumcheckProof: Vec<Vec<Vec<String>>>,
     pub sumcheckr: Vec<Vec<String>>,
     pub q: Vec<Vec<String>>,
-    pub f: Vec<String>,
     pub D: Vec<Vec<String>>,
     pub z: Vec<Vec<String>>,
     pub r: Vec<String>,
     pub inputFunc: Vec<Vec<String>>,
-    pub add: Vec<Vec<Vec<String>>>,
-    pub mult: Vec<Vec<Vec<String>>>,
 }
 
 impl CircomInputProof {
@@ -43,13 +40,10 @@ impl CircomInputProof {
             sumcheckProof: sp.clone(),
             sumcheckr: sr,
             q: q.clone(),
-            f: f.clone(),
             D: q.clone(),
             z: q.clone(),
             r: f.clone(),
             inputFunc: q.clone(),
-            add: sp.clone(),
-            mult: sp.clone(),
         }
     }
 
@@ -66,7 +60,6 @@ impl CircomInputProof {
             .map(|p| stringify_fr_vector(p))
             .collect();
         let q: Vec<Vec<String>> = proof.q.iter().map(|p| stringify_fr_vector(p)).collect();
-        let f: Vec<String> = stringify_fr_vector(&proof.f);
         let d: Vec<Vec<String>> = proof.d.iter().map(|p| stringify_fr_vector(p)).collect();
         let z: Vec<Vec<String>> = proof.z.iter().map(|p| stringify_fr_vector(p)).collect();
         let r: Vec<String> = stringify_fr_vector(&proof.r);
@@ -75,28 +68,15 @@ impl CircomInputProof {
             .iter()
             .map(|p| stringify_fr_vector(p))
             .collect();
-        let add: Vec<Vec<Vec<String>>> = proof
-            .add
-            .iter()
-            .map(|p| p.iter().map(|f| stringify_fr_vector(f)).collect())
-            .collect();
-        let mult: Vec<Vec<Vec<String>>> = proof
-            .mult
-            .iter()
-            .map(|p| p.iter().map(|f| stringify_fr_vector(f)).collect())
-            .collect();
 
         CircomInputProof {
             sumcheckProof: sp,
             sumcheckr: sr,
             q,
-            f,
             D: d,
             z,
             r,
             inputFunc: input_func,
-            add,
-            mult,
         }
     }
 }
@@ -152,23 +132,6 @@ fn get_meta(proofs: &Vec<Proof<Fr>>) -> Vec<Meta> {
         // meta[7] = k_i(d - 1)
         let k_input = proof.k[proof.depth - 1];
         meta.push(k_input);
-
-        // meta[8] = largest # of terms among add_i
-        let l_add = proof.add.iter().map(|p| p.len()).max().unwrap();
-        meta.push(l_add);
-
-        // meta[9] = largest # of variables of add_i and mult_i
-        let l_var = proof
-            .add
-            .iter()
-            .map(|p| p.iter().map(|terms| terms.len()).max().unwrap())
-            .max()
-            .unwrap();
-        meta.push(l_var);
-
-        // meta[10] = largest # of terms among add_i
-        let l_mult = proof.mult.iter().map(|p| p.len()).max().unwrap();
-        meta.push(l_mult);
 
         meta.append(&mut proof.k.clone());
 
@@ -233,55 +196,13 @@ fn modify_proof_for_circom(proof: &Vec<Proof<Fr>>, meta_value: &Vec<Meta>) -> Ve
             z.push(new_p);
         }
 
-        let mut add = vec![];
-        for p in pr.add.iter() {
-            let mut new_p = vec![];
-            for terms in p.iter() {
-                let mut new_terms = terms.clone();
-                if terms.len() < meta[9] {
-                    let mut z = zeros(meta[9] - terms.len());
-                    new_terms.append(&mut z);
-                }
-                new_p.push(new_terms);
-            }
-            if p.len() < meta[8] {
-                for _ in 0..(meta[8] - p.len()) {
-                    let new_terms = zeros(meta[9]);
-                    new_p.push(new_terms);
-                }
-            }
-            add.push(new_p);
-        }
-
-        let mut mult = vec![];
-        for p in pr.mult.iter() {
-            let mut new_p = vec![];
-            for terms in p.iter() {
-                let mut new_terms = terms.clone();
-                if terms.len() < meta[9] {
-                    let mut z = zeros(meta[9] - terms.len());
-                    new_terms.append(&mut z);
-                }
-                new_p.push(new_terms);
-            }
-            if p.len() < meta[10] {
-                for _ in 0..(meta[10] - p.len()) {
-                    let new_terms = zeros(meta[9]);
-                    new_p.push(new_terms);
-                }
-            }
-            mult.push(new_p);
-        }
         let new_p = Proof {
             sumcheck_proofs,
             sumcheck_r,
             q,
             z,
-            f: pr.f.clone(),
             d: pr.d.clone(),
             r: pr.r.clone(),
-            add,
-            mult,
             depth: pr.depth,
             input_func: pr.input_func.clone(),
             k: pr.k.clone(),
@@ -304,13 +225,10 @@ fn modify_circom_file(path: String, meta_value: &Vec<Meta>) -> String {
     signal input sumcheckProof{{num}}[d{{num}} - 1][2 * largest_k{{num}}][{{ meta_4 }}];
     signal input sumcheckr{{num}}[d{{num}} - 1][2 * largest_k{{num}}];
     signal input q{{num}}[d{{num}} - 1][{{meta_5}}];
-    signal input f{{num}}[d{{num}} - 1];
     signal input D{{num}}[{{meta_3}}][{{meta_2}} + 1];
     signal input z{{num}}[d{{num}}][largest_k{{num}}];
     signal input r{{num}}[d{{num}} - 1];
     signal input inputFunc{{num}}[{{meta_6}}][{{meta_7}} + 1];
-    signal input add{{num}}[d{{num}} - 1][{{meta_8}}][{{meta_9}}];
-    signal input mult{{num}}[d{{num}} - 1][{{meta_10}}][{{meta_9}}];
     verifier[{{num}}] = VerifyGKR({{ meta }});
     var a{{num}} = {{ meta_0 }} - 1;
     for (var i = 0; i < a{{num}}; i++) {
@@ -335,9 +253,6 @@ fn modify_circom_file(path: String, meta_value: &Vec<Meta>) -> String {
             verifier[{{num}}].D[i][j] <== D{{num}}[i][j];
         }
     }
-    for (var i = 0; i < a{{num}}; i++) {
-        verifier[{{num}}].f[i] <== f{{num}}[i];
-    }
     for (var i = 0; i < a{{num}} + 1; i++) {
         for (var j = 0; j < {{ meta_1 }}; j++) {
             verifier[{{num}}].z[i][j] <== z{{num}}[i][j];
@@ -349,20 +264,6 @@ fn modify_circom_file(path: String, meta_value: &Vec<Meta>) -> String {
     for (var i = 0; i < {{ meta_6 }}; i++) {
         for (var j = 0; j < {{ meta_7 }} + 1; j++) {
             verifier[{{num}}].inputFunc[i][j] <== inputFunc{{num}}[i][j];
-        }
-    }
-    for (var i = 0; i < a{{num}}; i++) {
-        for (var j = 0; j < {{ meta_8 }}; j++) {
-            for (var k = 0; k < {{ meta_9 }}; k++) {
-                verifier[{{num}}].add[i][j][k] <== add{{num}}[i][j][k];
-            }
-        }
-    }
-    for (var i = 0; i < a{{num}}; i++) {
-        for (var j = 0; j < {{ meta_10 }}; j++) {
-            for (var k = 0; k < {{ meta_9 }}; k++) {
-                verifier[{{num}}].mult[i][j][k] <== mult{{num}}[i][j][k];
-            }
         }
     }
     ";
@@ -535,7 +436,7 @@ pub fn prove_all(circuit_path: String, input_paths: Vec<String>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{modify_circom_file, prove_all, Meta};
+    use super::{modify_circom_file, prove_all};
 
     #[test]
     fn test_proving() {

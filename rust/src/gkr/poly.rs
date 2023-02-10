@@ -499,7 +499,8 @@ pub fn reduce_multiple_polynomial<S: PrimeField<Repr = [u8; 32]>>(
     res
 }
 
-pub fn get_multi_ext<S: PrimeField<Repr = [u8; 32]>>(value: &Vec<S>, v: usize) -> Vec<Vec<S>> {
+pub fn get_multi_ext<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(value: &Vec<S>, v: usize) -> Vec<Vec<S>> {
+    let mut map: HashMap<Vec<S>, S> = HashMap::new();
     let binary = generate_binary_string(v);
     let mut polynomial: Vec<Vec<S>> = vec![];
     for b in binary {
@@ -514,7 +515,24 @@ pub fn get_multi_ext<S: PrimeField<Repr = [u8; 32]>>(value: &Vec<S>, v: usize) -
         }
         polynomial.append(&mut res);
     }
-    polynomial
+    let mut res = vec![];
+    for t in polynomial {
+        if map.contains_key(&t[1..]) {
+            *map.get_mut(&t[1..]).unwrap() += t[0];
+        } else {
+            map.insert(t[1..].to_vec(), t[0]);
+        }
+    }
+    for (poly, constant) in map.iter() {
+        if constant.clone() == S::zero() {
+            continue;
+        }
+        let mut new_poly = vec![constant.clone()];
+        let mut p_cloned = poly.clone();
+        new_poly.append(&mut p_cloned);
+        res.push(new_poly)
+    }
+    res
 }
 
 pub fn l_function<S: PrimeField<Repr = [u8; 32]>>(b: &Vec<S>, c: &Vec<S>, r: &S) -> Vec<S> {

@@ -12,7 +12,6 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
     let mut sumcheck_proofs = vec![];
     let mut sumcheck_r = vec![];
     let mut q = vec![];
-    let mut f_res = vec![];
     let mut r_stars = vec![];
     let mut z_zero = vec![];
     for _ in 0..circuit.layer[0].k {
@@ -72,24 +71,6 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
 
         q.push(q_i);
 
-        let r_sub = &r[0..r.len() - 1].to_vec();
-        let w_i_b_res = partial_eval_from(&w_i_ext_b, r_sub, 1);
-        let w_i_c_res = partial_eval_from(&w_i_ext_c, r_sub, 1);
-        let add_i_res = partial_eval_from_binary_form(&add_res, r_sub, 1);
-        let mult_i_res = partial_eval_from_binary_form(&mult_res, r_sub, 1);
-
-        let w_i_b_coeffs = get_univariate_coeff(&w_i_b_res, r.len(), false);
-        let w_i_c_coeffs = get_univariate_coeff(&w_i_c_res, r.len(), false);
-        let add_coeffs = get_univariate_coeff(&add_i_res, r.len(), true);
-        let mult_coeffs = get_univariate_coeff(&mult_i_res, r.len(), true);
-        let b_c_add = add_univariate(&w_i_b_coeffs, &w_i_c_coeffs);
-        let b_c_mult = mult_univariate(&w_i_b_coeffs, &w_i_c_coeffs);
-        let add = mult_univariate(&b_c_add, &add_coeffs);
-        let mult = mult_univariate(&b_c_mult, &mult_coeffs);
-        let f_modified_uni = add_univariate(&add, &mult);
-
-        f_res.push(eval_univariate(&f_modified_uni, &r[r.len() - 1]));
-
         let mimc_r_star = sumcheck_proof[sumcheck_proof.len() - 1]
             .iter()
             .map(|s| convert_s_to_fr(s))
@@ -104,15 +85,12 @@ pub fn prove<S: PrimeField<Repr = [u8; 32]> + std::hash::Hash>(
     Proof {
         sumcheck_proofs,
         sumcheck_r,
-        f: f_res,
         d: input.d.clone(),
         q,
         z,
         r: r_stars,
         depth: circuit.depth() + 1,
         input_func: input.w(circuit.depth()),
-        add: circuit.get_add_list(),
-        mult: circuit.get_mult_list(),
         k: circuit.get_k_list(),
     }
 }
