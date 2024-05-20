@@ -169,6 +169,7 @@ class polynomial:
         res = UnivariateExpansion([field.FQ.zero()], 0)
         for t in self.terms:
             res += t.get_expansion()
+        res.coeffs.append(self.constant)
         return res
 
 class UnivariateExpansion:
